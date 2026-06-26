@@ -3,6 +3,7 @@
 """从 space-track.org 获取低轨卫星 TLE 数据（使用 requests）"""
 
 import os
+import re
 import sys
 import requests
 
@@ -158,7 +159,6 @@ def main():
     }
     print('--- 已知星座/卫星 ---')
     for label, pattern in sorted(constellations.items()):
-        import re
         count = sum(1 for l in name_lines if re.search(pattern, l, re.IGNORECASE))
         if count > 0:
             print(f'  {label:20s}  {count:5d} 颗')
@@ -212,6 +212,48 @@ def main():
     print('--- 最新10颗卫星(按更新时间) ---')
     for l in name_lines[:10]:
         print(f'  [{l[:70].strip()}]')
+
+    # -- 如果 GW 为空，搜索所有中文相关卫星 --
+    gw_count = sum(1 for l in name_lines if re.search(r'(?:^|\s)GW(?:[-\s]|\d|$)', l, re.IGNORECASE))
+    guowang_count = sum(1 for l in name_lines if re.search('GUOWANG', l, re.IGNORECASE))
+    if gw_count == 0 and guowang_count == 0:
+        print()
+        print('🔍 GW 搜索为空，正在探索数据中所有卫星命名规律...')
+        # 收集所有含 CHINA 的卫星名
+        china_names = [l.strip() for l in name_lines if re.search(r'\bCHINA\b', l, re.IGNORECASE)]
+        if china_names:
+            print(f'--- 含 "CHINA" 的卫星名 ({len(china_names)} 颗) ---')
+            for name in china_names[:15]:
+                print(f'  [{name[:70]}]')
+            if len(china_names) > 15:
+                print(f'  ... 还有 {len(china_names)-15} 颗')
+        # 收集常见中文卫星前缀
+        chinese_prefixes = {
+            'SJ (实践)':     r'\bSJ[- ]',
+            'XS (行式)':     r'\bXS[- ]',
+            'CQ (重庆)':     r'\bCQ[- ]',
+            'TKS':          r'\bTKS',
+            'CX (创新)':     r'\bCX[- ]',
+            'SY (试验)':     r'\bSY[- ]',
+            'JS':           r'\bJS[- ]',
+        }
+        found_prefixes = False
+        for label, pat in chinese_prefixes.items():
+            count = sum(1 for l in name_lines if re.search(pat, l, re.IGNORECASE))
+            if count > 0:
+                if not found_prefixes:
+                    print('--- 常见中文卫星前缀 ---')
+                    found_prefixes = True
+                print(f'  {label:15s}: {count} 颗')
+        if not found_prefixes:
+            print('  (未找到常见中文卫星前缀)')
+        # 搜索名字中包含数字+字母组合、可能是实验星的
+        print('--- 名字含 "OBJECT" 的实验星 ---')
+        obj_count = sum(1 for l in name_lines if 'OBJECT' in l.upper())
+        print(f'  OBJECT: {obj_count} 颗')
+        print('--- 名字含 "TECH" 或 "TEST" 的技术试验星 ---')
+        tech_count = sum(1 for l in name_lines if re.search(r'\b(TECH|TEST|DEMO)\b', l, re.IGNORECASE))
+        print(f'  TECH/TEST/DEMO: {tech_count} 颗')
 
 
 if __name__ == '__main__':
