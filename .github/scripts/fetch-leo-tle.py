@@ -124,25 +124,91 @@ def main():
         print(f'{i+1:2d}: {line[:80]}')
     print('-----------------------------')
 
-    # 7. 检查星座（卫星名在每组的第1行）
+    # 7. 详细分类统计（卫星名在每组的第1行）
     name_lines = lines[0::3]  # 每3行的第1行是卫星名
-    qf_count = sum(1 for l in name_lines if 'QIANFAN' in l.upper())
-    gw_count = sum(1 for l in name_lines if 'GW' in l.upper() or 'GUOWANG' in l.upper())
-    starlink_count = sum(1 for l in name_lines if 'STARLINK' in l.upper())
-    oneweb_count = sum(1 for l in name_lines if 'ONEWEB' in l.upper())
-    print(f'🔍 QIANFAN: {qf_count} 颗')
-    print(f'🔍 GW: {gw_count} 颗')
-    print(f'🔍 Starlink: {starlink_count} 颗')
-    print(f'🔍 OneWeb: {oneweb_count} 颗')
 
-    if qf_count == 0 and starlink_count == 0:
-        print('⚠️ 没有识别到任何已知星座卫星')
-        print('   可能原因: 3le 格式不包含卫星名，或时间过滤太严格')
-        # 显示所有卫星名帮助调试
-        print('--- 所有卫星名(前20) ------')
-        for l in name_lines[:20]:
-            print(f'   [{l[:60]}]')
-        print('----------------------------')
+    print()
+    print('=' * 50)
+    print('📊 卫星详细分类')
+    print('=' * 50)
+
+    # -- 已知星座 --
+    constellations = {
+        'Starlink':    'STARLINK',
+        'OneWeb':      'ONEWEB',
+        '千帆(QIANFAN)': 'QIANFAN',
+        'GW/国网':      r'GW[-\s]',
+        'Iridium':     'IRIDIUM',
+        'Globalstar':  'GLOBALSTAR',
+        'Orbcomm':     'ORBCOMM',
+        'LaserCube':   'LASERCUBE',
+        'Planet Labs': 'PLANET',
+        'Spire':       'LEMUR',
+        'Swarm':       'SWARM',
+        'AST Space':   'AST\b',
+        'Kuiper':      'KUIPER',
+        'ISS':         'ISS\b',
+        '风云(FY)':     'FENGYUN',
+        '遥感(YG)':     'YAOGAN',
+        '高分(GF)':     'GAOFEN',
+        '北斗(BD)':     'BEIDOU',
+    }
+    print('--- 已知星座/卫星 ---')
+    for label, pattern in sorted(constellations.items()):
+        import re
+        count = sum(1 for l in name_lines if re.search(pattern, l, re.IGNORECASE))
+        if count > 0:
+            print(f'  {label:20s}  {count:5d} 颗')
+
+    # -- 按卫星类型分组 --
+    categories = {
+        '碎片 (DEB)':         r'\bDEB\b',
+        '火箭体 (R/B)':       r'\bR/B\b',
+        '上面级 (PKM)':       r'\bPKM\b',
+        '有效载荷 (PLD)':     r'\bPLD\b',
+        '其他物体 (TBA/UNK)': r'\b(TBA|UNK)\b',
+    }
+    print('--- 按卫星类型 ---')
+    debris_count = 0
+    for label, pattern in categories.items():
+        count = sum(1 for l in name_lines if re.search(pattern, l, re.IGNORECASE))
+        if count > 0:
+            print(f'  {label:25s}  {count:5d} 颗')
+            debris_count += count
+    print(f'  {"其他(含正常运行卫星)":25s}  {len(name_lines) - debris_count:5d} 颗')
+
+    # -- NORAD ID 范围 --
+    # 从 TLE 行1 提取 NORAD ID (第3-7字符)
+    norad_ids = []
+    for l in lines[1::3]:  # TLE 行1
+        try:
+            norad_ids.append(int(l[2:7].strip()))
+        except (ValueError, IndexError):
+            pass
+    if norad_ids:
+        print(f'--- 轨道信息 ---')
+        print(f'  NORAD ID 范围:  {min(norad_ids):06d} ~ {max(norad_ids):06d}')
+
+    # -- MEAN_MOTION 范围 --
+    motions = []
+    for l in lines[2::3]:  # TLE 行2
+        try:
+            # 第53-63字符约是 MEAN_MOTION
+            val = float(l[52:63].strip())
+            motions.append(val)
+        except (ValueError, IndexError):
+            pass
+    if motions:
+        print(f'  MEAN_MOTION 范围: {min(motions):.2f} ~ {max(motions):.2f} rev/day')
+        print(f'  轨道周期范围: {format(1440/max(motions), ".1f")} ~ {format(1440/min(motions), ".1f")} 分钟')
+
+    # -- 前10和后10卫星名 --
+    print('--- 最早10颗卫星(按更新时间) ---')
+    for l in name_lines[-10:]:
+        print(f'  [{l[:70].strip()}]')
+    print('--- 最新10颗卫星(按更新时间) ---')
+    for l in name_lines[:10]:
+        print(f'  [{l[:70].strip()}]')
 
 
 if __name__ == '__main__':
