@@ -17,27 +17,38 @@ jobs:
           SPACETRACK_USER: ${{ secrets.SPACETRACK_USER }}
           SPACETRACK_PASS: ${{ secrets.SPACETRACK_PASS }}
         run: |
-          # 1. 登录获取 cookie
-          COOKIE=$(curl -s -c - "https://www.space-track.org/ajaxauth/login" \
-            -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}" 2>/dev/null | \
-            grep JSESSIONID | awk '{print $NF}')
+          # 查询地址
+          QUERY_URL="https://www.space-track.org/basicspacedata/query/class/tle/OBJECT_NAME/QIANFAN~~/orderby/EPOCH%20desc/limit/300/format/tle"
 
-          if [ -z "$COOKIE" ]; then
-            echo "❌ Space-Track 登录失败"
+          # 1. 登录（携带 query 参数，一次性完成登录+授权）
+          curl -s -c cookies.txt \
+            "https://www.space-track.org/ajaxauth/login" \
+            -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}&query=${QUERY_URL}"
+
+          echo "--- cookies.txt ---"
+          cat cookies.txt
+
+          # 2. 检查 cookie
+          if [ ! -f cookies.txt ] || ! grep -q "JSESSIONID" cookies.txt; then
+            echo "❌ Space-Track 登录失败 - 未获取到 JSESSIONID"
             exit 1
           fi
           echo "✅ Space-Track 登录成功"
 
-          # 2. 查询 QIANFAN 卫星 TLE
-          curl -s -b "JSESSIONID=${COOKIE}" \
-            "https://www.space-track.org/basicspacedata/query/class/tle/OBJECT_NAME/QIANFAN~~/orderby/EPOCH%20desc/limit/300/format/tle" \
+          # 3. 用同一 session 直接请求（此时已有授权）
+          curl -s -b cookies.txt -L "${QUERY_URL}" \
             -o app/src/main/assets/qianfan_tle_backup.txt
 
-          # 3. 验证数据有效性
-          if head -1 app/src/main/assets/qianfan_tle_backup.txt | grep -q "^QIANFAN"; then
+          # 4. 调试：查看返回内容
+          echo "📝 返回内容前 10 行:"
+          head -10 app/src/main/assets/qianfan_tle_backup.txt
+
+          # 4. 验证数据有效性
+          if grep -q "^QIANFAN" app/src/main/assets/qianfan_tle_backup.txt; then
             echo "✅ TLE 数据获取成功，共 $(wc -l < app/src/main/assets/qianfan_tle_backup.txt) 行"
           else
-            echo "❌ TLE 数据格式异常"
+            echo "❌ TLE 数据格式异常 - 未找到 QIANFAN"
+            cat app/src/main/assets/qianfan_tle_backup.txt
             exit 1
           fi
 
