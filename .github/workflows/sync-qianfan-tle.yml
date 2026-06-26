@@ -17,38 +17,67 @@ jobs:
           SPACETRACK_USER: ${{ secrets.SPACETRACK_USER }}
           SPACETRACK_PASS: ${{ secrets.SPACETRACK_PASS }}
         run: |
-          # 查询地址
-          QUERY_URL="https://www.space-track.org/basicspacedata/query/class/tle/OBJECT_NAME/QIANFAN~~/orderby/EPOCH%20desc/limit/300/format/tle"
+          # 关闭 -e，方便调试
+          set +e
 
-          # 1. 登录（携带 query 参数，一次性完成登录+授权）
-          curl -s -c cookies.txt \
+          echo "=== 1. 尝试直接登录（不传 query）==="
+          HTTP_CODE=$(curl -s -w "%{http_code}" -c cookies1.txt \
             "https://www.space-track.org/ajaxauth/login" \
-            -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}&query=${QUERY_URL}"
+            -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}" \
+            -o login1_response.txt)
+          echo "HTTP状态码: ${HTTP_CODE}"
+          echo "--- 登录返回内容 ---"
+          head -5 login1_response.txt 2>/dev/null
+          echo ""
+          echo "--- cookies1.txt ---"
+          cat cookies1.txt 2>/dev/null || echo "(空)"
 
-          echo "--- cookies.txt ---"
-          cat cookies.txt
+          echo ""
+          echo "=== 2. 尝试带 query 参数登录 ==="
+          QUERY_URL="https://www.space-track.org/basicspacedata/query/class/tle/OBJECT_NAME/QIANFAN~~/orderby/EPOCH%20desc/limit/300/format/tle"
+          HTTP_CODE2=$(curl -s -w "%{http_code}" -c cookies2.txt \
+            "https://www.space-track.org/ajaxauth/login" \
+            -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}&query=${QUERY_URL}" \
+            -o login2_response.txt)
+          echo "HTTP状态码: ${HTTP_CODE2}"
+          echo "--- 登录返回内容 ---"
+          head -5 login2_response.txt 2>/dev/null
+          echo ""
+          echo "--- cookies2.txt ---"
+          cat cookies2.txt 2>/dev/null || echo "(空)"
 
-          # 2. 检查 cookie
-          if [ ! -f cookies.txt ] || ! grep -q "JSESSIONID" cookies.txt; then
-            echo "❌ Space-Track 登录失败 - 未获取到 JSESSIONID"
+          # 3. 只要有一个 cookie 成功就用它
+          if [ -f cookies2.txt ] && grep -q "JSESSIONID" cookies2.txt; then
+            echo "✅ 方式2登录成功"
+            COOKIE_FILE="cookies2.txt"
+          elif [ -f cookies1.txt ] && grep -q "JSESSIONID" cookies1.txt; then
+            echo "✅ 方式1登录成功"
+            COOKIE_FILE="cookies1.txt"
+          else
+            echo "❌ 两种方式都未获取到 JSESSIONID，登录失败"
             exit 1
           fi
-          echo "✅ Space-Track 登录成功"
 
-          # 3. 用同一 session 直接请求（此时已有授权）
-          curl -s -b cookies.txt -L "${QUERY_URL}" \
-            -o app/src/main/assets/qianfan_tle_backup.txt
+          # 4. 查询 TLE
+          curl -b "${COOKIE_FILE}" -L "${QUERY_URL}" -o qianfan_raw.txt 2>&1
+          echo ""
+          echo "=== 返回内容前 30 行 ==="
+          head -30 qianfan_raw.txt 2>/dev/null
+          echo ""
+          echo "=== 末尾 10 行 ==="
+          tail -10 qianfan_raw.txt 2>/dev/null
+          echo ""
+          echo "=== 总行数 ==="
+          wc -l < qianfan_raw.txt 2>/dev/null || echo "文件不存在"
 
-          # 4. 调试：查看返回内容
-          echo "📝 返回内容前 10 行:"
-          head -10 app/src/main/assets/qianfan_tle_backup.txt
+          # 5. 写入目标文件
+          cp qianfan_raw.txt app/src/main/assets/qianfan_tle_backup.txt
 
-          # 4. 验证数据有效性
-          if grep -q "^QIANFAN" app/src/main/assets/qianfan_tle_backup.txt; then
-            echo "✅ TLE 数据获取成功，共 $(wc -l < app/src/main/assets/qianfan_tle_backup.txt) 行"
+          # 6. 验证
+          if grep -q "^QIANFAN" qianfan_raw.txt; then
+            echo "✅ TLE 数据获取成功！"
           else
-            echo "❌ TLE 数据格式异常 - 未找到 QIANFAN"
-            cat app/src/main/assets/qianfan_tle_backup.txt
+            echo "❌ 未找到 QIANFAN 卫星数据"
             exit 1
           fi
 
