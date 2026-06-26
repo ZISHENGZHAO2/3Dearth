@@ -13,7 +13,8 @@ def try_query(session, url_path, label):
     print(f'  ⏳ [{label}] GET {url}')
     resp = session.get(url)
     if resp.status_code == 200 and resp.text.strip():
-        print(f'  ✅ [{label}] 成功 ({len(resp.text.strip().split(chr(10)))} 行)')
+        lines_count = len(resp.text.strip().split('\n'))
+        print(f'  ✅ [{label}] 成功 ({lines_count} 行)')
         return True, resp.text.strip()
     else:
         print(f'  ❌ [{label}] HTTP {resp.status_code}')
@@ -39,71 +40,77 @@ def main():
         sys.exit(1)
     print('✅ 登录成功')
 
-    # 2. 逐步尝试不同的查询组合，找出可用的
+    # 2. 调试测试：尝试不同格式和过滤条件
     queries = [
-        # 简单测试 - 不加任何过滤
-        ('/class/gp/limit/3/format/tle', 'gp 基础测试'),
-        # 去掉 ORDINAL（gp 可能不支持）
-        ('/class/gp/MEAN_MOTION/%3E11/limit/3/format/tle', 'gp + MEAN_MOTION'),
-        # 只加 ORDINAL
-        ('/class/gp/ORDINAL/1/limit/3/format/tle', 'gp + ORDINAL'),
-        # 按日期过滤（最近7天）
-        ('/class/gp/EPOCH/%3Enow-7/limit/3/format/tle', 'gp + EPOCH'),
-        # 不带 limit 测试
-        ('/class/gp/MEAN_MOTION/%3E11/NORAD_CAT_ID/40069/format/tle', 'gp + MEAN_MOTION + NORAD_CAT_ID'),
+        # format/tle 是 2 行格式（无卫星名）
+        ('/class/gp/MEAN_MOTION/%3E11/limit/3/format/tle', 'gp + MEAN_MOTION (2行格式)'),
+        # format/3le 是 3 行格式（含卫星名）
+        ('/class/gp/MEAN_MOTION/%3E11/limit/3/format/3le', 'gp + MEAN_MOTION (3行格式)'),
+        # 也可以试试 format/tle 加 OBJECT_NAME 字段
+        ('/class/gp/MEAN_MOTION/%3E11/EPOCH/%3Enow-30/limit/3/format/3le', 'gp + MEAN_MOTION + EPOCH (3行格式)'),
+        # 不加 MEAN_MOTION 试试 3le
+        ('/class/gp/limit/3/format/3le', 'gp 基础 (3行格式)'),
     ]
 
     results = {}
     for path, label in queries:
         success, text = try_query(session, path, label)
         results[label] = (success, text)
-        print()  # 空行分隔
+        if success and text:
+            # 显示前3行看看格式
+            lines = text.strip().split('\n')
+            for i, l in enumerate(lines[:3]):
+                print(f'    第{i+1}行: {l[:80]}')
+        print()
 
-    # 3. 选择可用的查询方式，获取完整数据
+    # 3. 选择最佳查询获取完整数据
     print('=' * 50)
     print('选择最佳查询获取完整数据...')
     print('=' * 50)
 
     tle_text = None
+    chosen_label = None
 
-    # 优先用带 MEAN_MOTION 过滤的
-    for label_key in ['gp + MEAN_MOTION', 'gp + MEAN_MOTION + NORAD_CAT_ID']:
-        if label_key in results and results[label_key][0]:
-            print(f'✅ 使用 "{label_key}" 查询')
-            # 构造完整查询（去掉 limit/3）
-            path = '/class/gp/MEAN_MOTION/%3E11/limit/5000/format/tle'
-            print(f'   GET /basicspacedata/query{path}')
-            resp = session.get(f'https://www.space-track.org/basicspacedata/query{path}')
-            if resp.status_code == 200 and resp.text.strip():
-                tle_text = resp.text.strip()
-                break
-            else:
-                print(f'   ❌ HTTP {resp.status_code}')
+    # 方案 A: MEAN_MOTION + EPOCH 3行格式 (LEO + 近30天)
+    candidate = 'gp + MEAN_MOTION + EPOCH (3行格式)'
+    if candidate in results and results[candidate][0]:
+        chosen_label = candidate
+        path = '/class/gp/MEAN_MOTION/%3E11/EPOCH/%3Enow-30/limit/5000/format/3le'
 
-    # 如果 MEAN_MOTION 不行，用 EPOCH 过滤（最近7天的所有数据）
-    if not tle_text and 'gp + EPOCH' in results and results['gp + EPOCH'][0]:
-        print('✅ 使用 EPOCH 查询（最近7天所有卫星）')
-        path = '/class/gp/EPOCH/%3Enow-7/limit/5000/format/tle'
+    # 方案 B: 只有 MEAN_MOTION 3行格式
+    if not tle_text:
+        candidate = 'gp + MEAN_MOTION (3行格式)'
+        if candidate in results and results[candidate][0]:
+            chosen_label = candidate
+            path = '/class/gp/MEAN_MOTION/%3E11/limit/5000/format/3le'
+
+    # 方案 C: 只加 EPOCH 3行格式（最近7天所有卫星）
+    if not tle_text:
+        candidate = 'gp 基础 (3行格式)'
+        if candidate in results and results[candidate][0]:
+            chosen_label = 'EPOCH (3行格式)'
+            path = '/class/gp/EPOCH/%3Enow-7/limit/5000/format/3le'
+
+    if chosen_label:
+        print(f'✅ 使用 "{chosen_label}" 查询')
         print(f'   GET /basicspacedata/query{path}')
         resp = session.get(f'https://www.space-track.org/basicspacedata/query{path}')
         if resp.status_code == 200 and resp.text.strip():
             tle_text = resp.text.strip()
-
-    # 最后兜底：不加任何过滤（获取所有数据）
-    if not tle_text:
-        print('⚠️ 使用无过滤查询（所有卫星）')
-        path = '/class/gp/limit/5000/format/tle'
-        print(f'   GET /basicspacedata/query{path}')
-        resp = session.get(f'https://www.space-track.org/basicspacedata/query{path}')
-        if resp.status_code == 200 and resp.text.strip():
-            tle_text = resp.text.strip()
+        else:
+            print(f'   ❌ HTTP {resp.status_code}')
+            print(f'   {resp.text[:200]}')
+    else:
+        print('❌ 没有可用的查询方案')
+        sys.exit(1)
 
     if not tle_text:
-        print('❌ 所有查询都失败了')
+        print('❌ 查询结果为空')
         sys.exit(1)
 
     # 4. 统计
     lines = [l for l in tle_text.split('\n') if l.strip()]
+    # 3行格式：卫星名行 + 行1 + 行2
     sat_count = len(lines) // 3
     print(f'📊 获取到约 {sat_count} 颗卫星')
 
@@ -117,27 +124,31 @@ def main():
     print(f'✅ 已写入 {output_path}')
     print(f'📄 大小: {os.path.getsize(output_path)} 字节')
 
-    # 6. 显示前10行
-    print('--- 前10行 ------------------')
-    for i, line in enumerate(lines[:10]):
-        print(f'{i+1:2d}: {line}')
+    # 6. 显示前6行（2颗卫星）
+    print('--- 前6行 ------------------')
+    for i, line in enumerate(lines[:6]):
+        print(f'{i+1:2d}: {line[:80]}')
     print('-----------------------------')
 
-    # 7. 检查星座
-    qf_count = sum(1 for l in lines if 'QIANFAN' in l.upper())
-    gw_count = sum(1 for l in lines if 'GW' in l.upper() or 'GUOWANG' in l.upper())
-    starlink_count = sum(1 for l in lines if 'STARLINK' in l.upper())
-    oneweb_count = sum(1 for l in lines if 'ONEWEB' in l.upper())
+    # 7. 检查星座（卫星名在每组的第1行）
+    name_lines = lines[0::3]  # 每3行的第1行是卫星名
+    qf_count = sum(1 for l in name_lines if 'QIANFAN' in l.upper())
+    gw_count = sum(1 for l in name_lines if 'GW' in l.upper() or 'GUOWANG' in l.upper())
+    starlink_count = sum(1 for l in name_lines if 'STARLINK' in l.upper())
+    oneweb_count = sum(1 for l in name_lines if 'ONEWEB' in l.upper())
     print(f'🔍 QIANFAN: {qf_count} 颗')
     print(f'🔍 GW: {gw_count} 颗')
     print(f'🔍 Starlink: {starlink_count} 颗')
     print(f'🔍 OneWeb: {oneweb_count} 颗')
 
-    # 8. 输出低轨卫星占比（如果用了无过滤查询）
-    if 'MEAN_MOTION' not in path:
-        leo_count = sum(1 for l in lines[:sat_count*3] if l.strip() and not l.startswith('1 ') and not l.startswith('2 '))
-        print(f'📌 所有卫星: {sat_count} 颗')
-        print('💡 建议: 如果查询没有 MEAN_MOTION 过滤，数据可能包含 GEO/MEO 卫星')
+    if qf_count == 0 and starlink_count == 0:
+        print('⚠️ 没有识别到任何已知星座卫星')
+        print('   可能原因: 3le 格式不包含卫星名，或时间过滤太严格')
+        # 显示所有卫星名帮助调试
+        print('--- 所有卫星名(前20) ------')
+        for l in name_lines[:20]:
+            print(f'   [{l[:60]}]')
+        print('----------------------------')
 
 
 if __name__ == '__main__':
