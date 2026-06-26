@@ -69,40 +69,32 @@ def main():
     print('=' * 50)
 
     tle_text = None
-    chosen_label = None
 
-    # 方案 A: MEAN_MOTION + EPOCH 3行格式 (LEO + 近30天)
-    candidate = 'gp + MEAN_MOTION + EPOCH (3行格式)'
-    if candidate in results and results[candidate][0]:
-        chosen_label = candidate
-        path = '/class/gp/MEAN_MOTION/%3E11/EPOCH/%3Enow-30/limit/5000/format/3le'
+    # 按优先级尝试查询方案
+    candidates = [
+        # 方案 A: MEAN_MOTION + EPOCH (LEO + 近30天，最精确)
+        ('MEAN_MOTION + EPOCH (3行格式)',
+         '/class/gp/MEAN_MOTION/%3E11/EPOCH/%3Enow-30/limit/10000/format/3le'),
+        # 方案 B: 只有 MEAN_MOTION (所有历史 LEO 卫星)
+        ('gp + MEAN_MOTION (3行格式)',
+         '/class/gp/MEAN_MOTION/%3E11/limit/10000/format/3le'),
+        # 方案 C: 只加 EPOCH (最近7天所有卫星，可能包含 GEO)
+        ('EPOCH (3行格式)',
+         '/class/gp/EPOCH/%3Enow-7/limit/10000/format/3le'),
+    ]
 
-    # 方案 B: 只有 MEAN_MOTION 3行格式
-    if not tle_text:
-        candidate = 'gp + MEAN_MOTION (3行格式)'
-        if candidate in results and results[candidate][0]:
-            chosen_label = candidate
-            path = '/class/gp/MEAN_MOTION/%3E11/limit/5000/format/3le'
-
-    # 方案 C: 只加 EPOCH 3行格式（最近7天所有卫星）
-    if not tle_text:
-        candidate = 'gp 基础 (3行格式)'
-        if candidate in results and results[candidate][0]:
-            chosen_label = 'EPOCH (3行格式)'
-            path = '/class/gp/EPOCH/%3Enow-7/limit/5000/format/3le'
-
-    if chosen_label:
-        print(f'✅ 使用 "{chosen_label}" 查询')
-        print(f'   GET /basicspacedata/query{path}')
-        resp = session.get(f'https://www.space-track.org/basicspacedata/query{path}')
-        if resp.status_code == 200 and resp.text.strip():
-            tle_text = resp.text.strip()
-        else:
-            print(f'   ❌ HTTP {resp.status_code}')
-            print(f'   {resp.text[:200]}')
-    else:
-        print('❌ 没有可用的查询方案')
-        sys.exit(1)
+    for label_key, path in candidates:
+        if label_key in results and results[label_key][0]:
+            print(f'✅ 使用 "{label_key}" 查询')
+            print(f'   GET /basicspacedata/query{path}')
+            resp = session.get(f'https://www.space-track.org/basicspacedata/query{path}')
+            if resp.status_code == 200 and resp.text.strip():
+                tle_text = resp.text.strip()
+                break
+            else:
+                print(f'   ❌ HTTP {resp.status_code}')
+                if resp.text:
+                    print(f'   {resp.text[:200]}')
 
     if not tle_text:
         print('❌ 查询结果为空')
