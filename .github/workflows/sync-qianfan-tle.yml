@@ -1,4 +1,4 @@
-name: 同步千帆星座 TLE 数据
+name: 同步低轨卫星 TLE 数据
 
 on:
   schedule:
@@ -12,52 +12,68 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 登录 Space-Track.org 并获取 QIANFAN TLE
+      - name: 登录 Space-Track.org 并获取 TLE 数据
         env:
           SPACETRACK_USER: ${{ secrets.SPACETRACK_USER }}
           SPACETRACK_PASS: ${{ secrets.SPACETRACK_PASS }}
         run: |
           set +e
 
-          echo "=== 登录 Space-Track ==="
+          echo "=== 1. 登录 Space-Track ==="
           curl -s -c cookies.txt \
             "https://www.space-track.org/ajaxauth/login" \
             -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}"
 
-          echo "--- cookies.txt ---"
-          cat cookies.txt
-
-          # 检查 cookie 是否成功（新版用 chocolatechip，旧版用 JSESSIONID）
-          if grep -qE "chocolatechip|JSESSIONID" cookies.txt; then
-            echo "✅ 登录成功"
-          else
-            echo "❌ 登录失败 - 未获取到有效的 cookie"
+          if ! grep -qE "chocolatechip|JSESSIONID" cookies.txt; then
+            echo "❌ 登录失败"
+            cat cookies.txt
             exit 1
           fi
+          echo "✅ 登录成功"
 
           echo ""
-          echo "=== 查询 QIANFAN TLE ==="
-          QUERY_URL="https://www.space-track.org/basicspacedata/query/class/tle/OBJECT_NAME/QIANFAN~~/orderby/EPOCH%20desc/limit/300/format/tle"
-          curl -s -b cookies.txt -L "${QUERY_URL}" -o qianfan_raw.txt
-
-          echo "=== 返回内容前 30 行 ==="
-          head -30 qianfan_raw.txt 2>/dev/null
+          echo "=== 2. 测试 API 连通性（获取 3 条）==="
+          curl -s -b cookies.txt -L \
+            "https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/limit/3/format/tle" \
+            -o test_result.txt
+          head -10 test_result.txt
           echo ""
-          echo "=== 末尾 10 行 ==="
-          tail -10 qianfan_raw.txt 2>/dev/null
+          echo "总行数: $(wc -l < test_result.txt)"
+
           echo ""
-          echo "=== 总行数 ==="
-          wc -l < qianfan_raw.txt 2>/dev/null || echo "空文件"
+          echo "=== 3. 获取低轨卫星数据（MEAN_MOTION > 11）==="
+          # MEAN_MOTION > 11 rev/day 表示轨道周期 < 130 分钟，即低轨卫星
+          # limit/2000 控制数据量，避免文件过大
+          curl -s -b cookies.txt -L \
+            "https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/MEAN_MOTION/%3E11/orderby/NORAD_CAT_ID%20asc/limit/2000/format/tle" \
+            -o leo_result.txt
+          echo "返回前 30 行:"
+          head -30 leo_result.txt
+          echo ""
+          echo "总行数: $(wc -l < leo_result.txt)"
 
-          # 写入目标文件
-          cp qianfan_raw.txt app/src/main/assets/qianfan_tle_backup.txt
-
-          # 验证
-          if grep -q "^QIANFAN" qianfan_raw.txt; then
-            echo "✅ TLE 数据获取成功！"
+          # 检查是否拿到了正常数据
+          if grep -q "^[A-Z]" leo_result.txt && grep -q "^1 " leo_result.txt; then
+            echo "✅ LEO 数据获取成功！"
+            cp leo_result.txt app/src/main/assets/qianfan_tle_backup.txt
           else
-            echo "❌ 未找到 QIANFAN 卫星数据"
-            exit 1
+            echo "⚠️ MEAN_MOTION 查询可能没数据，尝试备用方案"
+            echo ""
+            echo "=== 4. 备用：获取最近 7 天的所有卫星数据 ==="
+            curl -s -b cookies.txt -L \
+              "https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-7/orderby/NORAD_CAT_ID%20asc/format/tle" \
+              -o all_result.txt
+            head -30 all_result.txt
+            echo ""
+            echo "总行数: $(wc -l < all_result.txt)"
+
+            if grep -q "^[A-Z]" all_result.txt && grep -q "^1 " all_result.txt; then
+              echo "✅ 数据获取成功！"
+              cp all_result.txt app/src/main/assets/qianfan_tle_backup.txt
+            else
+              echo "❌ 所有查询都失败了"
+              exit 1
+            fi
           fi
 
       - name: 提交更新
@@ -66,7 +82,7 @@ jobs:
           git config user.email "bot@github.com"
           git add app/src/main/assets/qianfan_tle_backup.txt
           git diff --quiet || {
-            git commit -m "🛰️ 自动同步 QIANFAN 星座 TLE 数据 $(date +%Y-%m-%d)"
+            git commit -m "🛰️ 自动同步低轨卫星 TLE 数据 $(date +%Y-%m-%d)"
             git push
             echo "✅ 已提交并推送更新"
           }
