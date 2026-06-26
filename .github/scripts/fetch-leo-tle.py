@@ -156,6 +156,8 @@ def main():
         '北斗(BD)':     'BEIDOU',
         '吉林(JILIN)':  'JILIN',
         '珞珈(LUOJIA)': 'LUOJIA',
+        '天智(TIANZHI)': 'TIANZHI',
+        'TZ卫星':       r'\bTZ[- ]',
     }
     print('--- 已知星座/卫星 ---')
     for label, pattern in sorted(constellations.items()):
@@ -254,6 +256,34 @@ def main():
         print('--- 名字含 "TECH" 或 "TEST" 的技术试验星 ---')
         tech_count = sum(1 for l in name_lines if re.search(r'\b(TECH|TEST|DEMO)\b', l, re.IGNORECASE))
         print(f'  TECH/TEST/DEMO: {tech_count} 颗')
+
+    # -- 用户自定义搜索 --
+    print()
+    print('--- 自定义搜索 ---')
+    custom_keywords = [
+        '天智', 'TIANZHI', 'TZ-', 'TZ ',
+        '紫丁香', 'LILACSAT', 'LILAC',
+        '银河', 'YINHE', 'MILKY WAY',
+        '星网', 'XINGWANG',
+        'SATRIA',
+    ]
+    found_custom = False
+    for kw in custom_keywords:
+        count = sum(1 for l in name_lines if re.search(kw, l, re.IGNORECASE))
+        if count > 0:
+            found_custom = True
+            print(f'  "{kw}": {count} 颗')
+            matches = [l.strip() for l in name_lines if re.search(kw, l, re.IGNORECASE)]
+            for m in matches[:3]:
+                print(f'    例: [{m[:70]}]')
+    if not found_custom:
+        # 模糊搜索：找名字较短、可能是实验星的卫星
+        print('  (未找到匹配，显示一些可能相关的实验星)')
+        short_names = [l.strip() for l in name_lines
+                       if len(l.replace('0 ', '').strip()) < 15
+                       and not re.search(r'(DEB|R/B|PKM|STARLINK|ONEWEB|IRIDIUM|FENGYUN|YAOGAN)', l, re.IGNORECASE)]
+        for m in short_names[:10]:
+            print(f'    实验星: [{m[:70]}]')
 
 
 if __name__ == '__main__':
