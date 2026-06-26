@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
     // 3. celestrak.com: 旧域名备用
     private val tleSources = listOf(
         // 由 .github/workflows/sync-qianfan-tle.yml 自动同步，改 YOUR_USER 为你的 GitHub 用户名
-        "https://raw.githubusercontent.com/YOUR_USER/TwinkStar/main/app/src/main/assets/qianfan_tle_backup.txt",
+        "https://raw.githubusercontent.com/ZISHENGZHAO2/3Dearth/main/app/src/main/assets/qianfan_tle_backup.txt",
         "https://celestrak.org/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle",
         "https://www.celestrak.com/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle"
     )
