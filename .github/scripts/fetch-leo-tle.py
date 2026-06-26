@@ -109,11 +109,55 @@ def main():
     sat_count = len(lines) // 3
     print(f'📊 获取到约 {sat_count} 颗卫星')
 
+    # 4b. 只保留已知星座的卫星（过滤碎片、火箭体、其他）
+    keep_patterns = {
+        'STARLINK',
+        'ONEWEB',
+        'QIANFAN',
+        'IRIDIUM',
+        'GLOBALSTAR',
+        'ORBCOMM',
+        'KUIPER',
+        'LEMUR',       # Spire
+        'SWARM',
+        'ISS',
+        'TIANMU',
+        'FENGYUN',
+        'YAOGAN',
+        'GAOFEN',
+        'JILIN',
+        'LUOJIA',
+    }
+    # AST Space 匹配的是 "AST" 开头（不只是 "AST" 子串，避免误匹配）
+    # 例: "AST" 可能匹配 "GASTON"，但 "AST\b" 只匹配以 AST 开头的词
+    def is_keep(name_line):
+        name = name_line.strip().upper()
+        for pat in keep_patterns:
+            if pat in name:
+                return True
+        # AST: 要求完整单词（避免误匹配 "GASTON"、"FAST" 等）
+        if re.search(r'\bAST\b', name):
+            return True
+        return False
+
+    filtered_entries = []
+    for i in range(0, len(lines), 3):
+        if i + 2 < len(lines):
+            name_line = lines[i]
+            if is_keep(name_line):
+                filtered_entries.extend([lines[i], lines[i+1], lines[i+2]])
+
+    filtered_text = '\n'.join(filtered_entries)
+    original_count = sat_count
+    sat_count = len(filtered_entries) // 3
+    print(f'🔍 星座过滤后保留 {sat_count} 颗卫星 (移除了 {original_count - sat_count} 颗)')
+    lines = filtered_entries  # 后续分析使用过滤后的数据
+
     # 5. 写入文件
     output_path = 'app/src/main/assets/qianfan_tle_backup.txt'
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(tle_text)
-        if not tle_text.endswith('\n'):
+        f.write(filtered_text)
+        if not filtered_text.endswith('\n'):
             f.write('\n')
 
     print(f'✅ 已写入 {output_path}')
