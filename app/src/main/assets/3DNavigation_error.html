@@ -1545,12 +1545,40 @@
             return tex;
         }
 
-        // 从 Celestrak 获取 TLE（通过 Android 桥接）
+        // 从本地备份或远程获取 TLE
         async function fetchTLE(name) {
+            // 1) 优先从本地备份文件读取（由 GitHub Actions 从 space-track.org 同步）
+            try {
+                const resp = await fetch('qianfan_tle_backup.txt');
+                if (resp.ok) {
+                    const text = await resp.text();
+                    if (text && text.trim().length > 0) {
+                        // 只保留该星座的条目（3行一组，第1行包含星座名）
+                        const lines = text.trim().split('\n');
+                        const out = [];
+                        const upper = name.toUpperCase();
+                        for (let i = 0; i <= lines.length - 3; i += 3) {
+                            const nameLine = (lines[i] || '').toUpperCase();
+                            // 星链/千帆等直接包含星座名；AST/ISS 需要单词边界匹配
+                            if (nameLine.includes(upper) || new RegExp('\\b' + upper + '\\b').test(nameLine)) {
+                                out.push(lines[i], lines[i+1], lines[i+2]);
+                            }
+                        }
+                        if (out.length) {
+                            console.log(`[${name}] 从本地备份读取到 ${out.length/3} 颗卫星`);
+                            return out.join('\n');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn(`[${name}] 本地备份读取失败:`, e);
+            }
+
+            // 2) 通过 Android 桥接获取（由 MainActivity 预加载）
             if (window.AndroidBridge && AndroidBridge['get' + name + 'TLE']) {
                 try {
                     const raw = AndroidBridge['get' + name + 'TLE']();
-                    if (raw && raw.startsWith(name)) {
+                    if (raw && raw.trim().length > 0) {
                         console.log(`[${name}] 通过 Android 桥接获取 TLE 数据`);
                         return raw;
                     }
@@ -1558,6 +1586,8 @@
                     console.warn(`[${name}] Android 桥接获取失败:`, e);
                 }
             }
+
+            // 3) 最后 fallback 到 celestrak.org（国内可能无法访问）
             try {
                 const resp = await fetch(`https://celestrak.org/NORAD/elements/gp.php?NAME=${name}&FORMAT=tle`);
                 if (resp.ok) {
@@ -1565,7 +1595,7 @@
                     if (text.startsWith(name)) return text;
                 }
             } catch (e) {
-                console.warn(`[${name}] 直接 fetch 失败:`, e);
+                console.warn(`[${name}] Celestrak 获取失败:`, e);
             }
             return null;
         }

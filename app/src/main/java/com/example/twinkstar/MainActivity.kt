@@ -127,11 +127,36 @@ class MainActivity : AppCompatActivity() {
     // 2. celestrak.org: 官方原版
     // 3. celestrak.com: 旧域名备用
     private val tleSources = listOf(
-        // 由 .github/workflows/sync-qianfan-tle.yml 自动同步，改 YOUR_USER 为你的 GitHub 用户名
+        // 由 .github/workflows/sync-qianfan-tle.yml 自动同步
         "https://raw.githubusercontent.com/ZISHENGZHAO2/3Dearth/main/app/src/main/assets/qianfan_tle_backup.txt",
         "https://celestrak.org/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle",
         "https://www.celestrak.com/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle"
     )
+
+    /**
+     * 过滤 TLE 文本，只保留有效数据行（跳过注释/空行）
+     * 有效 TLE 格式：卫星名行、第1行（以"1 "开头）、第2行（以"2 "开头）
+     */
+    private fun filterValidTLE(raw: String): String {
+        val lines = raw.lines().filter { line ->
+            line.isNotBlank() && !line.trimStart().startsWith("#")
+        }
+        // 只保留完整的 3 行一组的数据（卫星名 + 行1 + 行2）
+        val validGroups = mutableListOf<String>()
+        var i = 0
+        while (i + 2 < lines.size) {
+            val nameLine = lines[i]
+            val line1 = lines[i + 1]
+            val line2 = lines[i + 2]
+            if (line1.startsWith("1 ") && line2.startsWith("2 ")) {
+                validGroups.addAll(listOf(nameLine, line1, line2))
+                i += 3
+            } else {
+                i++
+            }
+        }
+        return validGroups.joinToString("\n")
+    }
 
     private fun fetchQianfanTLE() {
         thread(start = true) {
@@ -148,12 +173,17 @@ class MainActivity : AppCompatActivity() {
                     conn.readTimeout = 10000
                     if (conn.responseCode == 200) {
                         val data = conn.inputStream.bufferedReader().use { it.readText() }
-                        if (data.isNotBlank() && data.startsWith("QIANFAN")) {
-                            qianfanTLE = data
-                            Log.i("TwinkStar", "千帆星座 TLE 获取成功: ${data.length} 字符")
+                        val filtered = filterValidTLE(data)
+                        if (filtered.isNotBlank()) {
+                            qianfanTLE = filtered
+                            Log.i("TwinkStar", "TLE 数据获取成功: ${filtered.length} 字符 (原始 ${data.length})")
                             conn.disconnect()
                             return@thread
+                        } else {
+                            Log.w("TwinkStar", "TLE 源 [$source] 返回 200 但数据为空/无效")
                         }
+                    } else {
+                        Log.w("TwinkStar", "TLE 源 [$source] HTTP ${conn.responseCode}")
                     }
                     conn.disconnect()
                 } catch (e: Exception) {
@@ -166,10 +196,13 @@ class MainActivity : AppCompatActivity() {
             try {
                 val backup = assets.open("qianfan_tle_backup.txt")
                     .bufferedReader().use { it.readText() }
-                if (backup.isNotBlank() && backup.startsWith("QIANFAN")) {
-                    qianfanTLE = backup
-                    Log.i("TwinkStar", "使用离线 TLE 备用数据: ${backup.length} 字符")
+                val filtered = filterValidTLE(backup)
+                if (filtered.isNotBlank()) {
+                    qianfanTLE = filtered
+                    Log.i("TwinkStar", "使用离线 TLE 备用数据: ${filtered.length} 字符")
                     return@thread
+                } else {
+                    Log.w("TwinkStar", "离线 TLE 备用数据为空或无效（仅含注释），等待 Actions 同步")
                 }
             } catch (e: Exception) {
                 Log.e("TwinkStar", "离线 TLE 备用数据加载失败", e)

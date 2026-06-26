@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 安装 Python 依赖
-        run: pip install spacetrack
+        run: pip install requests
 
       - name: 获取低轨卫星 TLE 数据
         env:
@@ -25,8 +25,10 @@ jobs:
         run: |
           git config user.name "TLE Sync Bot"
           git config user.email "bot@github.com"
-          git add app/src/main/assets/qianfan_tle_backup.txt
-          git diff --quiet || {
+          # 先用模板初始化空文件（确保文件被 git 追踪）
+          # 比较暂存区 vs 上次提交，只有真有变化时才提交
+          git add -A app/src/main/assets/qianfan_tle_backup.txt
+          git diff --cached --quiet || {
             git commit -m "🛰️ 自动同步低轨卫星 TLE 数据 $(date +%Y-%m-%d)"
             git push
             echo "✅ 已提交并推送更新"

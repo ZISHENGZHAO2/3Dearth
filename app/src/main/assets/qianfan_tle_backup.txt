@@ -1,0 +1,4 @@
+# 千帆星座（QIANFAN）TLE 离线备份
+# 由 .github/workflows/sync-qianfan-tle.yml 自动同步
+# 最后更新: 2026-06-26
+# 如果此文件为空，请检查 GitHub Actions 是否已正确配置 SPACETRACK_USER / SPACETRACK_PASS secrets

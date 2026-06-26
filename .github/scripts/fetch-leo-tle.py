@@ -156,6 +156,11 @@ def main():
     # 5. 写入文件
     output_path = 'app/src/main/assets/qianfan_tle_backup.txt'
     with open(output_path, 'w', encoding='utf-8') as f:
+        # 写入文件头注释
+        f.write('# 低轨卫星 TLE 离线备份\n')
+        f.write(f'# 由 fetch-leo-tle.py 自动生成 | {__import__("datetime").datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC\n')
+        f.write('# 仅供 TwinkStar App 离线回退使用\n')
+        f.write('#\n')
         f.write(filtered_text)
         if not filtered_text.endswith('\n'):
             f.write('\n')
