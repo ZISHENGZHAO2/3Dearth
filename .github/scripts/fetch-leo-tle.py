@@ -46,9 +46,11 @@ def main():
         ('/class/gp/MEAN_MOTION/%3E11/limit/3/format/tle', 'gp + MEAN_MOTION (2行格式)'),
         # format/3le 是 3 行格式（含卫星名）
         ('/class/gp/MEAN_MOTION/%3E11/limit/3/format/3le', 'gp + MEAN_MOTION (3行格式)'),
-        # 也可以试试 format/tle 加 OBJECT_NAME 字段
+        # MEAN_MOTION + EPOCH 组合过滤 (LEO + 最近30天)
         ('/class/gp/MEAN_MOTION/%3E11/EPOCH/%3Enow-30/limit/3/format/3le', 'gp + MEAN_MOTION + EPOCH (3行格式)'),
-        # 不加 MEAN_MOTION 试试 3le
+        # 纯 EPOCH 过滤（所有轨道，最近7天）
+        ('/class/gp/EPOCH/%3Enow-7/limit/3/format/3le', 'gp + EPOCH'),
+        # 不加任何过滤
         ('/class/gp/limit/3/format/3le', 'gp 基础 (3行格式)'),
     ]
 
@@ -72,15 +74,15 @@ def main():
 
     # 按优先级尝试查询方案
     candidates = [
-        # 方案 A: MEAN_MOTION + EPOCH (LEO + 近30天，最精确)
-        ('MEAN_MOTION + EPOCH (3行格式)',
-         '/class/gp/MEAN_MOTION/%3E11/EPOCH/%3Enow-30/limit/10000/format/3le'),
-        # 方案 B: 只有 MEAN_MOTION (所有历史 LEO 卫星)
+        # 方案 A: MEAN_MOTION + EPOCH (LEO + 近30天，按更新时间倒序)
+        ('gp + MEAN_MOTION + EPOCH (3行格式)',
+         '/class/gp/MEAN_MOTION/%3E11/EPOCH/%3Enow-30/orderby/EPOCH%20desc/limit/10000/format/3le'),
+        # 方案 B: 只有 MEAN_MOTION (所有历史 LEO 卫星，按 ID 倒序)
         ('gp + MEAN_MOTION (3行格式)',
-         '/class/gp/MEAN_MOTION/%3E11/limit/10000/format/3le'),
-        # 方案 C: 只加 EPOCH (最近7天所有卫星，可能包含 GEO)
-        ('EPOCH (3行格式)',
-         '/class/gp/EPOCH/%3Enow-7/limit/10000/format/3le'),
+         '/class/gp/MEAN_MOTION/%3E11/orderby/NORAD_CAT_ID%20desc/limit/10000/format/3le'),
+        # 方案 C: 只加 EPOCH (最近7天所有卫星，按更新时间倒序)
+        ('gp + EPOCH',
+         '/class/gp/EPOCH/%3Enow-7/orderby/EPOCH%20desc/limit/10000/format/3le'),
     ]
 
     for label_key, path in candidates:
