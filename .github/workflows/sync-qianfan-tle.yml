@@ -12,69 +12,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 登录 Space-Track.org 并获取 TLE 数据
+      - name: 安装 Python 依赖
+        run: pip install spacetrack
+
+      - name: 获取低轨卫星 TLE 数据
         env:
           SPACETRACK_USER: ${{ secrets.SPACETRACK_USER }}
           SPACETRACK_PASS: ${{ secrets.SPACETRACK_PASS }}
-        run: |
-          set +e
-
-          echo "=== 1. 登录 Space-Track ==="
-          curl -s -c cookies.txt \
-            "https://www.space-track.org/ajaxauth/login" \
-            -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}"
-
-          if ! grep -qE "chocolatechip|JSESSIONID" cookies.txt; then
-            echo "❌ 登录失败"
-            cat cookies.txt
-            exit 1
-          fi
-          echo "✅ 登录成功"
-
-          echo ""
-          echo "=== 2. 测试 API 连通性（获取 3 条）==="
-          curl -s -b cookies.txt -L \
-            "https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/limit/3/format/tle" \
-            -o test_result.txt
-          head -10 test_result.txt
-          echo ""
-          echo "总行数: $(wc -l < test_result.txt)"
-
-          echo ""
-          echo "=== 3. 获取低轨卫星数据（MEAN_MOTION > 11）==="
-          # MEAN_MOTION > 11 rev/day 表示轨道周期 < 130 分钟，即低轨卫星
-          # limit/2000 控制数据量，避免文件过大
-          curl -s -b cookies.txt -L \
-            "https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/MEAN_MOTION/%3E11/orderby/NORAD_CAT_ID%20asc/limit/2000/format/tle" \
-            -o leo_result.txt
-          echo "返回前 30 行:"
-          head -30 leo_result.txt
-          echo ""
-          echo "总行数: $(wc -l < leo_result.txt)"
-
-          # 检查是否拿到了正常数据
-          if grep -q "^[A-Z]" leo_result.txt && grep -q "^1 " leo_result.txt; then
-            echo "✅ LEO 数据获取成功！"
-            cp leo_result.txt app/src/main/assets/qianfan_tle_backup.txt
-          else
-            echo "⚠️ MEAN_MOTION 查询可能没数据，尝试备用方案"
-            echo ""
-            echo "=== 4. 备用：获取最近 7 天的所有卫星数据 ==="
-            curl -s -b cookies.txt -L \
-              "https://www.space-track.org/basicspacedata/query/class/tle_latest/ORDINAL/1/EPOCH/%3Enow-7/orderby/NORAD_CAT_ID%20asc/format/tle" \
-              -o all_result.txt
-            head -30 all_result.txt
-            echo ""
-            echo "总行数: $(wc -l < all_result.txt)"
-
-            if grep -q "^[A-Z]" all_result.txt && grep -q "^1 " all_result.txt; then
-              echo "✅ 数据获取成功！"
-              cp all_result.txt app/src/main/assets/qianfan_tle_backup.txt
-            else
-              echo "❌ 所有查询都失败了"
-              exit 1
-            fi
-          fi
+        run: python .github/scripts/fetch-leo-tle.py
 
       - name: 提交更新
         run: |
