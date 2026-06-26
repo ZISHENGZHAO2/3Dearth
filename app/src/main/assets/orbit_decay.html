@@ -18,9 +18,9 @@
             flex-direction: column;
             position: relative;
         }
-        #top-bar {
-            height: 40px;
-            background: rgba(5,10,25,0.95);
+        #top-nav {
+            height: 36px;
+            background: rgba(5,10,25,0.92);
             border-bottom: 1px solid rgba(68,136,170,0.4);
             display: flex;
             align-items: center;
@@ -28,17 +28,36 @@
             padding: 0 16px;
             flex-shrink: 0;
         }
-        #top-bar .title { color: #88ddff; font-size: 14px; font-weight: 600; }
-        #top-bar .back-btn {
-            background: rgba(68,136,170,0.3);
-            border: 1px solid rgba(68,136,170,0.5);
-            color: #88ddff;
+        .nav-page-btns {
+            display: flex;
+            gap: 6px;
+        }
+        .page-btn {
+            background: rgba(68,136,170,0.15);
+            border: 1px solid rgba(68,136,170,0.25);
+            color: #88bbdd;
             padding: 4px 12px;
             border-radius: 4px;
-            cursor: pointer;
             font-size: 12px;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
         }
-        #top-bar .back-btn:hover { background: rgba(68,136,170,0.5); }
+        .page-btn:hover {
+            background: rgba(68,136,170,0.35);
+            border-color: rgba(68,136,170,0.6);
+        }
+        .page-btn.active {
+            background: rgba(68,136,170,0.45);
+            border-color: #88ccff;
+            color: #ffffff;
+            font-weight: 600;
+        }
+        #top-nav .nav-time {
+            color: #ffaa44;
+            font-size: 13px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
         #scene-area { flex: 1; position: relative; overflow: hidden; }
 
         /* 右侧面板 35% */
@@ -222,10 +241,14 @@
 <div id="app">
     <!-- 左侧 3D 场景 -->
     <div id="scene-panel">
-        <div id="top-bar">
-            <span class="title">🛰️ 轨道衰减仿真</span>
-            <button class="back-btn" onclick="window.location.href='3DNavigation_error.html'">← 返回主界面</button>
-        </div>
+        <div id="top-nav">
+                <div class="nav-page-btns">
+                    <a class="page-btn" href="3DNavigation_error.html">🌍 星座信息系统</a>
+                    <a class="page-btn" href="tec_realtime.html">📊 TEC计算</a>
+                    <a class="page-btn active" href="orbit_decay.html">🛰️ 轨道衰减仿真</a>
+                </div>
+                <span class="nav-time" id="beijingClock">--:--:--</span>
+            </div>
         <div id="scene-area">
             <div id="controls-bar">
                 <button id="btnOrbitLine" class="active">隐藏轨道线</button>
@@ -725,6 +748,18 @@
         const w = sceneArea.clientWidth, h = sceneArea.clientHeight;
         camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
     });
+
+    // ====================== 北京时间时钟 ======================
+    function updateBeijingClock() {
+        const now = new Date();
+        const h = now.getHours().toString().padStart(2, '0');
+        const m = now.getMinutes().toString().padStart(2, '0');
+        const s = now.getSeconds().toString().padStart(2, '0');
+        const el = document.getElementById('beijingClock');
+        if (el) el.textContent = `北京时间 ${h}:${m}:${s}`;
+    }
+    setInterval(updateBeijingClock, 1000);
+    updateBeijingClock();
 </script>
 </body>
 </html>

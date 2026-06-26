@@ -122,29 +122,60 @@ class MainActivity : AppCompatActivity() {
         fetchQianfanTLE()
     }
 
+    // 多个 TLE 数据源，按优先级排列
+    // 1. GitHub raw: 由 Actions 从 Space-Track.org 自动同步（推荐，国内可访问）
+    // 2. celestrak.org: 官方原版
+    // 3. celestrak.com: 旧域名备用
+    private val tleSources = listOf(
+        // 由 .github/workflows/sync-qianfan-tle.yml 自动同步，改 YOUR_USER 为你的 GitHub 用户名
+        "https://raw.githubusercontent.com/YOUR_USER/TwinkStar/main/app/src/main/assets/qianfan_tle_backup.txt",
+        "https://celestrak.org/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle",
+        "https://www.celestrak.com/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle"
+    )
+
     private fun fetchQianfanTLE() {
         thread(start = true) {
-            try {
-                val url = URL("https://celestrak.org/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.setRequestProperty("User-Agent", "TwinkStar/1.0")
-                conn.connectTimeout = 15000
-                conn.readTimeout = 15000
-                if (conn.responseCode == 200) {
-                    val data = conn.inputStream.bufferedReader().use { it.readText() }
-                    if (data.isNotBlank() && data.startsWith("QIANFAN")) {
-                        qianfanTLE = data
-                        Log.i("TwinkStar", "千帆星座 TLE 数据获取成功: ${data.length} 字符")
-                    } else {
-                        Log.w("TwinkStar", "千帆星座 TLE 数据为空或格式异常")
+            var lastError: Exception? = null
+
+            // 依次尝试所有数据源
+            for (source in tleSources) {
+                try {
+                    Log.i("TwinkStar", "尝试获取 TLE: $source")
+                    val url = URL(source)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.setRequestProperty("User-Agent", "TwinkStar/1.0")
+                    conn.connectTimeout = 10000
+                    conn.readTimeout = 10000
+                    if (conn.responseCode == 200) {
+                        val data = conn.inputStream.bufferedReader().use { it.readText() }
+                        if (data.isNotBlank() && data.startsWith("QIANFAN")) {
+                            qianfanTLE = data
+                            Log.i("TwinkStar", "千帆星座 TLE 获取成功: ${data.length} 字符")
+                            conn.disconnect()
+                            return@thread
+                        }
                     }
-                } else {
-                    Log.w("TwinkStar", "千帆星座 TLE 请求失败: HTTP ${conn.responseCode}")
+                    conn.disconnect()
+                } catch (e: Exception) {
+                    lastError = e
+                    Log.w("TwinkStar", "TLE 源 [$source] 失败: ${e.message}")
                 }
-                conn.disconnect()
-            } catch (e: Exception) {
-                Log.e("TwinkStar", "千帆星座 TLE 获取失败", e)
             }
+
+            // 所有网络源都失败，尝试从 assets 加载备用数据
+            try {
+                val backup = assets.open("qianfan_tle_backup.txt")
+                    .bufferedReader().use { it.readText() }
+                if (backup.isNotBlank() && backup.startsWith("QIANFAN")) {
+                    qianfanTLE = backup
+                    Log.i("TwinkStar", "使用离线 TLE 备用数据: ${backup.length} 字符")
+                    return@thread
+                }
+            } catch (e: Exception) {
+                Log.e("TwinkStar", "离线 TLE 备用数据加载失败", e)
+            }
+
+            Log.e("TwinkStar", "千帆星座 TLE 所有数据源均获取失败", lastError)
         }
     }
 

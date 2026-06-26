@@ -38,29 +38,35 @@
             z-index: 100;
             flex-shrink: 0;
         }
-        #top-nav .nav-title {
-            color: #88ddff;
-            font-size: 14px;
+        .nav-page-btns {
+            display: flex;
+            gap: 6px;
+        }
+        .page-btn {
+            background: rgba(68,136,170,0.15);
+            border: 1px solid rgba(68,136,170,0.25);
+            color: #88bbdd;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .page-btn:hover {
+            background: rgba(68,136,170,0.35);
+            border-color: rgba(68,136,170,0.6);
+        }
+        .page-btn.active {
+            background: rgba(68,136,170,0.45);
+            border-color: #88ccff;
+            color: #ffffff;
             font-weight: 600;
-            letter-spacing: 1px;
         }
         #top-nav .nav-time {
             color: #ffaa44;
             font-size: 13px;
             font-family: 'Consolas', 'Monaco', monospace;
-        }
-        #top-nav .nav-link {
-            background: rgba(68,136,170,0.3);
-            border: 1px solid rgba(68,136,170,0.5);
-            color: #88ddff;
-            padding: 2px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 11px;
-            text-decoration: none;
-            margin-left: 12px;
-        }
-        #top-nav .nav-link:hover { background: rgba(68,136,170,0.5); }
         }
 
         /* 3D 场景区域 */
@@ -68,6 +74,12 @@
             flex: 1;
             position: relative;
             overflow: hidden;
+        }
+
+        #scene-area canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
         }
 
         /* 右侧35% */
@@ -257,65 +269,18 @@
 
         .toggle-btn.active { background: #00aa44; }
 
-        #tecPredictPanel {
-            padding: 0;
-        }
-
-        #tecPredictPanel .param-group {
-            margin-bottom: 12px;
-        }
-
-        #tecPredictPanel .param-group-title {
-            color: #88bbdd;
-            font-size: 11px;
-            font-weight: 600;
-            margin-bottom: 6px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid rgba(68,136,170,0.2);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        #tecPredictPanel .param-group-title .toggle-icon {
-            cursor: pointer;
-            font-size: 10px;
-            transition: transform 0.2s;
-        }
-
-        #tecPredictPanel .param-group-title .toggle-icon.collapsed {
-            transform: rotate(-90deg);
-        }
-
-        #tecPredictPanel .param-group-content {
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
-        #tecPredictPanel .param-group-content.collapsed {
-            max-height: 0 !important;
-            margin: 0;
-            padding: 0;
-        }
-
-        #tecPredictTimeRow {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-
-        #tecPredictTimeRow .time-field {
+        .time-field {
             flex: 1;
         }
 
-        #tecPredictTimeRow .time-field label {
+        .time-field label {
             display: block;
             color: #8899aa;
             font-size: 10px;
             margin-bottom: 3px;
         }
 
-        #tecPredictTimeRow .time-field input {
+        .time-field input {
             width: 100%;
             background: rgba(255,255,255,0.08);
             border: 1px solid rgba(68,136,170,0.4);
@@ -327,59 +292,10 @@
             box-sizing: border-box;
         }
 
-        #tecPredictTimeRow .time-field input:focus {
+        .time-field input:focus {
             border-color: #88ccff;
             outline: none;
             background: rgba(255,255,255,0.12);
-        }
-
-        #btnPredictTEC {
-            width: 100%;
-            margin-top: 10px;
-            padding: 8px;
-            background: linear-gradient(135deg, #0066cc, #0044aa);
-            font-size: 12px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            border: none;
-            color: white;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        #btnPredictTEC:hover {
-            background: linear-gradient(135deg, #0088ff, #0066cc);
-        }
-
-        #btnPredictTEC:disabled {
-            background: rgba(68,136,170,0.3);
-            cursor: not-allowed;
-        }
-
-        #tecPredictResult {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #8899aa;
-            display: none;
-        }
-
-        #tecPredictResult.visible {
-            display: block;
-        }
-
-        #tecPredictResult .result-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-        }
-
-        #tecPredictResult .result-label {
-            color: #667788;
-        }
-
-        #tecPredictResult .result-value {
-            color: #88ddff;
-            font-family: 'Consolas', 'Monaco', monospace;
         }
 
     </style>
@@ -391,145 +307,35 @@
         <div id="canvas-container">
             <!-- 顶部导航栏 -->
             <div id="top-nav">
-                <span class="nav-title">🌍 3D 地球可视化</span>
-                <div>
-                    <a class="nav-link" href="orbit_decay.html">🛰️ 轨道衰减仿真</a>
-                    <span class="nav-time" id="beijingClock">--:--:--</span>
+                <div class="nav-page-btns">
+                    <a class="page-btn active" href="3DNavigation_error.html">🌍 星座信息系统</a>
+                    <a class="page-btn" href="tec_realtime.html">📊 TEC计算</a>
+                    <a class="page-btn" href="orbit_decay.html">🛰️ 轨道衰减仿真</a>
                 </div>
+                <span class="nav-time" id="beijingClock">--:--:--</span>
             </div>
             <!-- 3D 场景 -->
             <div id="scene-area">
                 <div id="controls">
-                    <button id="btnHeatmap" class="toggle-btn">导航误差热力图</button>
-                    <button id="btnHeatMode" class="toggle-btn" style="display:none;">分层展开</button>
                     <button id="btnGrid" class="toggle-btn active">关闭网格</button>
-                    <button id="btnOrbitLine" class="toggle-btn active">隐藏轨道线</button>
-                    <button id="btnOrbitInfo" class="toggle-btn active">隐藏轨道信息</button>
+                    <button id="btnQianfan" class="toggle-btn active">千帆星座</button>
+                    <button id="btnGW" class="toggle-btn active">GW星座</button>
+                    <button id="btnJilin" class="toggle-btn active">吉林一号</button>
+                    <button id="btnTianzhi" class="toggle-btn active">天智系列</button>
+                    <button id="btnCloud" class="toggle-btn">开启云层</button>
                     <button id="btnOrbitScale" class="toggle-btn">LEO 正常视图</button>
                     <button id="btnCameraOrbit" class="toggle-btn">相机环绕</button>
                 </div>
+                
             </div>
         </div>
         <!-- 右侧容器 - 标签页切换 -->
         <div id="right-container">
             <div id="right-tab-bar">
-                <button class="right-tab-btn active" data-rtab="tec">📡 TEC 预测</button>
-                <button class="right-tab-btn" data-rtab="satdb">🛰️ 卫星仪表盘</button>
-            </div>
-            <!-- TEC 预测标签页 -->
-            <div id="tab-tec" class="right-tab-content active">
-                <div id="tecPredictPanel">
-                        <!-- 时间选择 -->
-                        <div id="tecPredictTimeRow">
-                            <div class="time-field">
-                                <label>年份</label>
-                                <input id="tecPredYear" type="number" value="2025" min="2000" max="2100">
-                            </div>
-                            <div class="time-field">
-                                <label>年积日</label>
-                                <input id="tecPredDoy" type="number" value="1" min="1" max="366">
-                            </div>
-                            <div class="time-field">
-                                <label>UT 时</label>
-                                <input id="tecPredHour" type="number" value="12" min="0" max="23">
-                            </div>
-                        </div>
-
-                        <!-- 太阳/地磁参数 -->
-                        <div class="param-group">
-                            <div class="param-group-title">
-                                <span>☀️ 太阳/地磁参数</span>
-                            </div>
-                            <div class="param-group-content">
-                                <div class="param-row">
-                                    <label>F10.7</label>
-                                    <div><input id="tecPredF107" type="number" value="150" step="1"><span class="unit">SFU</span></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>F10.7A</label>
-                                    <div><input id="tecPredF107A" type="number" value="145" step="1"><span class="unit">SFU</span></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>Dst</label>
-                                    <div><input id="tecPredDst" type="number" value="0" step="1"><span class="unit">nT</span></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>Ap</label>
-                                    <div><input id="tecPredAp" type="number" value="2" step="0.1"><span class="unit"></span></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>Kp</label>
-                                    <div><input id="tecPredKp" type="number" value="1.3" step="0.1"><span class="unit"></span></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 高级参数（可折叠） -->
-                        <div class="param-group">
-                            <div class="param-group-title">
-                                <span class="toggle-icon" id="toggleAdvancedParams">▼</span>
-                                <span>📊 历史记忆参数（可选）</span>
-                            </div>
-                            <div class="param-group-content" id="advancedParamsContent" style="max-height: 200px;">
-                                <div style="font-size:10px; color:#667788; margin-bottom:6px;">
-                                    留空则使用当前值作为默认值
-                                </div>
-                                <div class="param-row">
-                                    <label>Dst lag-1h</label>
-                                    <div><input id="tecPredDstLag1" type="number" placeholder="当前值" step="1"></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>Dst lag-3h</label>
-                                    <div><input id="tecPredDstLag3" type="number" placeholder="当前值" step="1"></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>Dst lag-6h</label>
-                                    <div><input id="tecPredDstLag6" type="number" placeholder="当前值" step="1"></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>Dst lag-12h</label>
-                                    <div><input id="tecPredDstLag12" type="number" placeholder="当前值" step="1"></div>
-                                </div>
-                                <div class="param-row">
-                                    <label>Dst lag-24h</label>
-                                    <div><input id="tecPredDstLag24" type="number" placeholder="当前值" step="1"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 预测按钮 -->
-                        <button id="btnPredictTEC">🧠 预测全球 TEC</button>
-
-
-                        <!-- 结果显示 -->
-                        <div id="tecPredictResult">
-                            <div class="result-row">
-                                <span class="result-label">数据时间</span>
-                                <span class="result-value" id="resultTime">--</span>
-                            </div>
-                            <div class="result-row">
-                                <span class="result-label">数据点数</span>
-                                <span class="result-value" id="resultPoints">--</span>
-                            </div>
-                            <div class="result-row">
-                                <span class="result-label">TEC 范围</span>
-                                <span class="result-value" id="resultRange">--</span>
-                            </div>
-                            <div class="result-row">
-                                <span class="result-label">峰值位置</span>
-                                <span class="result-value" id="resultPeak">--</span>
-                            </div>
-                        </div>
-
-                        <!-- TEC 预测热力图 -->
-                        <div id="tecPredictChart" style="margin-top: 10px; display: none;">
-                            <div style="color: #88bbdd; font-size: 11px; font-weight: 600; margin-bottom: 6px;">📊 预测 TEC 热力图</div>
-                            <canvas id="tecPredictCanvas" width="600" height="300" style="width: 100%; border-radius: 4px; border: 1px solid rgba(68,136,170,0.3); background: #0a0a2e;"></canvas>
-                        </div>
-                    </div>
+                <button class="right-tab-btn active" data-rtab="satdb">🛰️ 卫星仪表盘</button>
             </div>
             <!-- 卫星仪表盘标签页 -->
-            <div id="tab-satdb" class="right-tab-content">
+            <div id="tab-satdb" class="right-tab-content active">
                 <div id="sat-dashboard-list">
                     <div id="sat-dashboard-empty">🛰️ 点击 3D 地球上的卫星光点<br>即可在此显示卫星数据</div>
                 </div>
@@ -540,325 +346,14 @@
 
     <script src="three.min.js"></script>
     <script src="OrbitControls.js"></script>
-    <script src="tec-engine.js"></script>
     <script src="satellite.min.js"></script>
 
     <script>
-        // ====================== TEC 预测面板逻辑 ======================
-        // 高级参数折叠
-        document.getElementById('toggleAdvancedParams').addEventListener('click', () => {
-            const icon = document.getElementById('toggleAdvancedParams');
-            const content = document.getElementById('advancedParamsContent');
-            icon.classList.toggle('collapsed');
-            content.classList.toggle('collapsed');
-        });
-
-        // ====================== TEC 预测（后端 API） ======================
-        let predictedTecData = null;
-
-        // 离线 TEC 推理引擎
-        const tecEngine = new TecEngine();
-        let tecEngineReady = false;
-
-        // 初始化离线模型
-        (async function initTecEngine() {
-            try {
-                await tecEngine.init();
-                tecEngineReady = true;
-                console.log('[TEC Engine] Offline model loaded');
-            } catch (e) {
-                console.error('[TEC Engine] Load failed:', e);
-            }
-        })();
-
-        // TEC 预测主函数 (离线推理)
-        async function predictTEC() {
-            const btn = document.getElementById('btnPredictTEC');
-            const resultEl = document.getElementById('tecPredictResult');
-
-            btn.disabled = true;
-            btn.textContent = '⏳ 预测中...';
-            resultEl.classList.remove('visible');
-
-            try {
-                if (!tecEngineReady) {
-                    throw new Error('模型尚未加载完成');
-                }
-
-                // 获取输入参数
-                const year = parseInt(document.getElementById('tecPredYear').value) || 2025;
-                const doy = parseInt(document.getElementById('tecPredDoy').value) || 1;
-                const utHour = parseInt(document.getElementById('tecPredHour').value) || 12;
-                const f107 = parseFloat(document.getElementById('tecPredF107').value) || 150;
-                const f107a = parseFloat(document.getElementById('tecPredF107A').value) || 145;
-                const dst = parseFloat(document.getElementById('tecPredDst').value) || 0;
-                const ap = parseFloat(document.getElementById('tecPredAp').value) || 2;
-                const kp = parseFloat(document.getElementById('tecPredKp').value) || 1.3;
-
-                // 构建滞后参数
-                const memoryLags = { dst: {}, ap: {}, kp: {} };
-                [1, 3, 6, 12, 24].forEach(lag => {
-                    const dstVal = document.getElementById(`tecPredDstLag${lag}`).value;
-                    if (dstVal !== '') memoryLags.dst[lag] = parseFloat(dstVal);
-                });
-
-
-                // 本地推理
-                const geojson = await tecEngine.predict({
-                    year, doy, ut_hour: utHour,
-                    drivers: { f107, f107a, dst, ap, kp },
-                    memory_lags: memoryLags,
-                });
-
-                // 保存预测数据
-                predictedTecData = geojson;
-
-
-                // 显示结果
-                const features = geojson.features || [];
-                let minTec = Infinity, maxTec = -Infinity;
-                let peakLat = 0, peakLon = 0;
-
-                features.forEach(f => {
-                    const tec = f.properties.tec;
-                    if (tec < minTec) minTec = tec;
-                    if (tec > maxTec) { maxTec = tec; peakLat = f.properties.lat; peakLon = f.properties.lon; }
-                });
-
-                document.getElementById('resultTime').textContent = geojson.time_tag || '--';
-                document.getElementById('resultPoints').textContent = features.length.toLocaleString();
-                document.getElementById('resultRange').textContent = `${minTec.toFixed(1)} - ${maxTec.toFixed(1)} TECU`;
-                document.getElementById('resultPeak').textContent = `${peakLat.toFixed(1)}°, ${peakLon.toFixed(1)}°`;
-                resultEl.classList.add('visible');
-
-                // 渲染 TEC 预测热力图
-                renderTECPredictCanvas(geojson);
-
-                console.log('[TEC Predict] 预测完成，数据点:', features.length);
-
-            } catch (error) {
-                console.error('[TEC Predict] 预测失败:', error);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '🧠 预测全球 TEC';
-            }
-        }
-
-        // 绑定预测按钮事件
-        document.getElementById('btnPredictTEC').addEventListener('click', predictTEC);
-
-        // ====================== TEC 预测热力图渲染 ======================
-        // TEC 色图（jet colormap：蓝→青→绿→黄→红）
-        function tecToColor(tec) {
-            const t = Math.min(Math.max(tec / 100, 0), 1); // 100 TECU 为上限
-            if (t < 0.125) {
-                return { r: 0, g: 0, b: 0.5 + t * 4 };
-            } else if (t < 0.375) {
-                return { r: 0, g: (t - 0.125) * 4, b: 1 };
-            } else if (t < 0.625) {
-                return { r: (t - 0.375) * 4, g: 1, b: 1 - (t - 0.375) * 4 };
-            } else if (t < 0.875) {
-                return { r: 1, g: 1 - (t - 0.625) * 4, b: 0 };
-            } else {
-                return { r: 1 - (t - 0.875) * 2, g: 0, b: 0 };
-            }
-        }
-
-        // 渲染 TEC 预测热力图
-        function renderTECPredictCanvas(geojson) {
-            const canvas = document.getElementById('tecPredictCanvas');
-            if (!canvas || !geojson || !geojson.features) return;
-
-            const ctx = canvas.getContext('2d');
-            const W = canvas.width;
-            const H = canvas.height;
-
-            // 清空画布
-            ctx.fillStyle = '#0a0a2e';
-            ctx.fillRect(0, 0, W, H);
-
-            // 解析 TEC 数据到网格
-            const tecGrid = {};
-            let lats = new Set();
-            let lons = new Set();
-            let minTec = Infinity, maxTec = -Infinity;
-
-            for (const f of geojson.features) {
-                const [lon, lat] = f.geometry.coordinates;
-                const tec = f.properties.tec;
-                if (tec != null && !isNaN(tec)) {
-                    const key = `${lat.toFixed(1)}_${lon.toFixed(1)}`;
-                    tecGrid[key] = tec;
-                    lats.add(lat);
-                    lons.add(lon);
-                    if (tec < minTec) minTec = tec;
-                    if (tec > maxTec) maxTec = tec;
-                }
-            }
-
-            lats = [...lats].sort((a, b) => a - b);
-            lons = [...lons].sort((a, b) => a - b);
-
-            if (lats.length < 2 || lons.length < 2) {
-                console.warn('[TEC Predict] 数据不足以渲染');
-                return;
-            }
-
-            // 双线性插值函数
-            function interpolateTec(lat, lon) {
-                let latIdx = lats.findIndex(l => l >= lat);
-                let lonIdx = lons.findIndex(l => l >= lon);
-                if (latIdx < 0) latIdx = lats.length - 1;
-                if (lonIdx < 0) lonIdx = lons.length - 1;
-                if (latIdx === 0) latIdx = 1;
-                if (lonIdx === 0) lonIdx = 1;
-
-                const lat0 = lats[latIdx - 1], lat1 = lats[latIdx];
-                const lon0 = lons[lonIdx - 1], lon1 = lons[lonIdx];
-
-                const e00 = tecGrid[`${lat0.toFixed(1)}_${lon0.toFixed(1)}`] || 0;
-                const e10 = tecGrid[`${lat1.toFixed(1)}_${lon0.toFixed(1)}`] || 0;
-                const e01 = tecGrid[`${lat0.toFixed(1)}_${lon1.toFixed(1)}`] || 0;
-                const e11 = tecGrid[`${lat1.toFixed(1)}_${lon1.toFixed(1)}`] || 0;
-
-                const tx = (lon1 !== lon0) ? (lon - lon0) / (lon1 - lon0) : 0;
-                const ty = (lat1 !== lat0) ? (lat - lat0) / (lat1 - lat0) : 0;
-
-                return e00 * (1 - tx) * (1 - ty) + e10 * (1 - tx) * ty +
-                       e01 * tx * (1 - ty) + e11 * tx * ty;
-            }
-
-            // 绘图区域（留出色条空间）
-            const plotW = W - 50;
-            const plotH = H - 40;
-            const offsetX = 0;
-            const offsetY = 0;
-
-            // 创建热力图
-            const imageData = ctx.createImageData(plotW, plotH);
-            const pixels = imageData.data;
-
-            for (let py = 0; py < plotH; py++) {
-                const lat = 90 - (py / plotH) * 180;
-                for (let px = 0; px < plotW; px++) {
-                    const lon = (px / plotW) * 360 - 180;
-                    const tec = interpolateTec(lat, lon);
-                    const color = tecToColor(tec);
-                    const idx = (py * plotW + px) * 4;
-                    pixels[idx]     = Math.floor(color.r * 255);
-                    pixels[idx + 1] = Math.floor(color.g * 255);
-                    pixels[idx + 2] = Math.floor(color.b * 255);
-                    pixels[idx + 3] = 255;
-                }
-            }
-
-            ctx.putImageData(imageData, offsetX, offsetY);
-
-            // 绘制经纬线网格
-            ctx.strokeStyle = 'rgba(150,180,210,0.4)';
-            ctx.lineWidth = 0.5;
-
-            // 纬线（每30度）
-            for (let lat = -60; lat <= 60; lat += 30) {
-                const y = ((90 - lat) / 180) * plotH;
-                ctx.beginPath();
-                ctx.moveTo(offsetX, y);
-                ctx.lineTo(offsetX + plotW, y);
-                ctx.stroke();
-            }
-
-            // 经线（每45度）
-            for (let lon = -180; lon <= 180; lon += 45) {
-                const x = ((lon + 180) / 360) * plotW;
-                ctx.beginPath();
-                ctx.moveTo(x, offsetY);
-                ctx.lineTo(x, offsetY + plotH);
-                ctx.stroke();
-            }
-
-            // 赤道和本初子午线加粗
-            ctx.strokeStyle = 'rgba(200,230,255,0.6)';
-            ctx.lineWidth = 1;
-            // 赤道
-            const equatorY = plotH / 2;
-            ctx.beginPath();
-            ctx.moveTo(offsetX, equatorY);
-            ctx.lineTo(offsetX + plotW, equatorY);
-            ctx.stroke();
-
-            // 绘制经纬度标签
-            ctx.fillStyle = 'rgba(220,235,250,0.9)';
-            ctx.font = 'bold 9px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            // 经度标签
-            for (let lon = -180; lon <= 180; lon += 45) {
-                const x = ((lon + 180) / 360) * plotW;
-                const label = lon === 0 ? '0°' : (lon > 0 ? `${lon}°E` : `${Math.abs(lon)}°W`);
-                ctx.fillText(label, x, plotH + 2);
-            }
-            // 纬度标签
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            for (let lat = -60; lat <= 60; lat += 30) {
-                const y = ((90 - lat) / 180) * plotH;
-                const label = lat === 0 ? '0°' : (lat > 0 ? `${lat}°N` : `${Math.abs(lat)}°S`);
-                ctx.fillText(label, plotW - 2, y);
-            }
-
-            // 绘制垂直颜色条（右侧）
-            const barX = W - 35;
-            const barY = 10;
-            const barW = 12;
-            const barH = plotH - 20;
-
-            // 色条背景
-            ctx.fillStyle = 'rgba(0,0,0,0.7)';
-            ctx.fillRect(barX - 2, barY - 2, barW + 4, barH + 4);
-
-            // 色条渐变
-            for (let i = 0; i < barH; i++) {
-                const t = 1 - (i / barH);
-                const tec = t * 100;
-                const color = tecToColor(tec);
-                ctx.fillStyle = `rgb(${Math.floor(color.r*255)},${Math.floor(color.g*255)},${Math.floor(color.b*255)})`;
-                ctx.fillRect(barX, barY + i, barW, 1);
-            }
-
-            // 色条边框
-            ctx.strokeStyle = 'rgba(200,220,240,0.6)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(barX, barY, barW, barH);
-
-            // 色条刻度标签
-            ctx.fillStyle = 'rgba(220,235,250,0.95)';
-            ctx.font = 'bold 8px monospace';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            const tickValues = [0, 20, 40, 60, 80, 100];
-            for (const val of tickValues) {
-                const y = barY + barH - (val / 100) * barH;
-                ctx.strokeStyle = 'rgba(200,220,240,0.6)';
-                ctx.beginPath();
-                ctx.moveTo(barX + barW, y);
-                ctx.lineTo(barX + barW + 3, y);
-                ctx.stroke();
-                ctx.fillStyle = 'rgba(220,235,250,0.95)';
-                ctx.fillText(`${val}`, barX + barW + 4, y);
-            }
-            ctx.fillText('TECU', barX + barW + 4, barY - 8);
-
-            // 显示图表容器
-            document.getElementById('tecPredictChart').style.display = 'block';
-
-            console.log('[TEC Predict] 热力图渲染完成');
-        }
-
         // ====================== Three.js 场景初始化 ======================
         const sceneArea = document.getElementById('scene-area');
-        // 等待布局完成后再获取尺寸
-        const containerWidth = sceneArea.clientWidth || window.innerWidth * 0.65;
-        const containerHeight = sceneArea.clientHeight || window.innerHeight - 36;
+        const sceneAreaRect = sceneArea.getBoundingClientRect();
+        const containerWidth = sceneAreaRect.width || window.innerWidth * 0.65;
+        const containerHeight = sceneAreaRect.height || window.innerHeight - 36;
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(60, containerWidth / containerHeight, 0.1, 1000);
@@ -866,7 +361,7 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(containerWidth, containerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(1);
         sceneArea.insertBefore(renderer.domElement, sceneArea.firstChild);
         renderer.domElement.style.display = 'block';
 
@@ -876,10 +371,16 @@
         controls.enablePan = false;
 
         // ====================== 光源 ======================
-        const ambientLight = new THREE.AmbientLight(0x222244, 0.15);
+        // 基础环境光 — 极微弱，仅让背光面不至于全黑
+        const ambientLight = new THREE.AmbientLight(0x224466, 0.08);
         scene.add(ambientLight);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        // 天球光 — 微弱方向渐变，让阴影区有深蓝层次
+        const hemiLight = new THREE.HemisphereLight(0x4488ff, 0x001133, 0.2);
+        scene.add(hemiLight);
+
+        // 太阳光 — 强平行光，向阳面明亮
+        const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
         sunLight.position.set(5, 3, 5);
         scene.add(sunLight);
 
@@ -887,19 +388,80 @@
         const earthGeometry = new THREE.SphereGeometry(1, 64, 64);
         const textureLoader = new THREE.TextureLoader();
 
-        const threeTexBase = 'textures/';
-        const earthTexture = textureLoader.load(threeTexBase + 'earth_atmos_2048.jpg');
-        const earthBump = textureLoader.load(threeTexBase + 'earth_normal_2048.jpg');
+        // 生成一个简易程序化等距柱状地球纹理（作为兜底，永远不会黑）
+        function createFallbackEarthTexture() {
+            const c = document.createElement('canvas');
+            c.width = 1024; c.height = 512;
+            const ctx = c.getContext('2d');
+            // 深蓝色海洋
+            const grad = ctx.createLinearGradient(0, 0, 0, 512);
+            grad.addColorStop(0, '#1a3a5c');   // 北极
+            grad.addColorStop(0.5, '#1a5276'); // 赤道
+            grad.addColorStop(1, '#1a3a5c');   // 南极
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1024, 512);
+            // 简单的经线/纬线网格，标示这是地图
+            ctx.strokeStyle = 'rgba(100,180,255,0.15)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= 1024; x += 1024/24) { // 每15度经线
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
+            }
+            for (let y = 0; y <= 512; y += 512/12) { // 每15度纬线
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1024, y); ctx.stroke();
+            }
+            // 赤道加粗
+            ctx.strokeStyle = 'rgba(100,200,255,0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, 256); ctx.lineTo(1024, 256); ctx.stroke();
+            // 大陆轮廓（简化为一些色块区域，便于肉眼识别地图方向）
+            ctx.fillStyle = 'rgba(60,140,60,0.4)';
+            // 模拟欧亚大陆
+            ctx.fillRect(480, 140, 200, 80);
+            ctx.fillRect(560, 120, 80, 30);
+            // 模拟非洲
+            ctx.fillRect(490, 240, 50, 80);
+            // 模拟北美
+            ctx.fillRect(200, 120, 80, 60);
+            // 模拟南美
+            ctx.fillRect(250, 240, 30, 80);
+            // 模拟澳洲
+            ctx.fillRect(780, 300, 30, 25);
+            // 模拟南极
+            ctx.fillStyle = 'rgba(200,220,255,0.3)';
+            ctx.fillRect(0, 490, 1024, 22);
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            return tex;
+        }
 
+        const fallbackTex = createFallbackEarthTexture();
         const earthMaterial = new THREE.MeshPhongMaterial({
-            map: earthTexture,
-            normalMap: earthBump,
+            map: fallbackTex,
             shininess: 0,
             specular: new THREE.Color(0x000000)
         });
-
         const earth = new THREE.Mesh(earthGeometry, earthMaterial);
         scene.add(earth);
+
+        // 异步加载真实地球纹理：先尝试 Three.js 官方 CDN（标准等距柱状图），失败则回退本地文件
+        (async function loadRealEarthTex() {
+            const tryLoad = (url) => new Promise((resolve) => {
+                textureLoader.load(url, (tex) => resolve(tex), undefined, () => resolve(null));
+            });
+            let realTex = await tryLoad('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg');
+            if (!realTex) {
+                console.warn('[Earth] CDN 纹理加载失败，尝试本地文件');
+                realTex = await tryLoad('textures/earth_atmos_2048.jpg');
+            }
+            if (realTex) {
+                console.log('[Earth] 真实地球纹理加载成功');
+                earthMaterial.map = realTex;
+                earthMaterial.needsUpdate = true;
+            } else {
+                console.warn('[Earth] 所有纹理加载失败，使用程序化兜底纹理');
+            }
+        })();
 
         // 大气层光晕
         const atmosphereGeometry = new THREE.SphereGeometry(1.02, 64, 64);
@@ -912,6 +474,383 @@
         });
         const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
         scene.add(atmosphere);
+
+        // ====================== 云层系统（程序化+真实卫星云图双重保障） ======================
+        // 策略:
+        //   1. 立即生成程序化云纹理（保证始终有云可见）
+        //   2. 异步尝试加载CDN真实卫星云图（加载成功后替换）
+        //   3. 异步获取Open-Meteo密度数据叠加（增强动态感）
+        const cloudSystem = {
+            enabled: false,
+            sphere: null,
+            material: null,
+            texture: null,
+            canvas: null,
+            ctx: null,
+            updateIntervalMs: 60 * 60 * 1000,
+            lastUpdateTime: null,
+            isLoading: false,
+            hasRealData: false,
+            gridLats: [],
+            gridLons: []
+        };
+
+        for (let lat = -85; lat <= 85; lat += 10) cloudSystem.gridLats.push(lat);
+        for (let lon = -180; lon < 180; lon += 10) cloudSystem.gridLons.push(lon);
+
+        // ============ 核心：程序化云纹理（高密度厚重云层） ============
+        // 设计目标: 覆盖全球60%+面积，alpha均值120+，边缘清晰
+        function generateCloudTexture() {
+            const canvas = cloudSystem.canvas;
+            if (!canvas) return;
+            const ctx = cloudSystem.ctx;
+            const w = canvas.width, h = canvas.height;
+            const imageData = ctx.createImageData(w, h);
+            const pixels = imageData.data;
+
+            // 8层噪声，振幅总和=1.80，平均噪声≈0.90
+            const octaves = [
+                {fl:0.007, fo:0.006, amp:0.36, ph:0},
+                {fl:0.013, fo:0.012, amp:0.32, ph:1.8},
+                {fl:0.022, fo:0.020, amp:0.26, ph:3.5},
+                {fl:0.035, fo:0.032, amp:0.22, ph:5.2},
+                {fl:0.050, fo:0.045, amp:0.18, ph:7.0},
+                {fl:0.070, fo:0.062, amp:0.14, ph:9.0},
+                {fl:0.010, fo:0.025, amp:0.20, ph:2.2},
+                {fl:0.040, fo:0.055, amp:0.12, ph:6.5}
+            ];
+
+            for (let py = 0; py < h; py++) {
+                const lat = 90 - (py / h) * 180;
+                const absLat = Math.abs(lat);
+                // 气候因子：大幅放宽限制，极地也不削减太多
+                const itcz = Math.exp(-Math.pow(lat / 20, 2));
+                const storm = Math.exp(-Math.pow((absLat - 52) / 14, 2));
+                const polar = absLat > 70 ? Math.max(0.5, 1 - (absLat - 70) / 25) : 1;
+                const latFactor = Math.max(0.40, itcz * 0.50 + storm * 0.50) * polar;
+
+                for (let px = 0; px < w; px++) {
+                    const lon = (px / w) * 360 - 180;
+
+                    // 域扭曲：双频高振幅扭曲，产生有机漩涡
+                    const warp = Math.sin(lat * 0.006 + lon * 0.005) * 2.5 +
+                                 Math.sin(lat * 0.012 + lon * 0.010 + 2.0) * 1.5;
+                    const wLat = lat + warp * 0.40;
+                    const wLon = lon + warp * 0.40;
+
+                    // 8层噪声叠加（无循环展开，保持代码简洁）
+                    let value = 0;
+                    for (let o = 0; o < octaves.length; o++) {
+                        const oc = octaves[o];
+                        value += oc.amp * (Math.sin(wLat * oc.fl + wLon * oc.fo + oc.ph) * 0.5 + 0.5);
+                    }
+                    // value 现在在 [0, 1.60] 范围
+
+                    // 应用气候因子
+                    value *= latFactor;
+
+                    // ====== 极低阈值 + 高亮度映射 ======
+                    // 阈值低至0.02，几乎所有像素都保留
+                    const th = 0.02 + (1 - latFactor) * 0.04;
+                    if (value < th) {
+                        // 阈值以下：线性淡入到0.20
+                        value = (value / Math.max(th, 0.001)) * 0.20;
+                    } else {
+                        // 阈值以上：线性映射到[0.20, 1.0]并用pow<1大幅增亮
+                        const t = (value - th) / Math.max(1 - th, 0.001);
+                        value = 0.20 + t * 0.80;
+                        // pow(0.72) 使中间值显著变亮（0.5→0.61）
+                        value = Math.pow(value, 0.72);
+                    }
+
+                    // 高频毛绒细节（在所有可见云区域叠加）
+                    if (value > 0.08) {
+                        const f1 = Math.sin(wLat * 0.12 + wLon * 0.10 + 11.0) * 0.5 + 0.5;
+                        const f2 = Math.sin(wLat * 0.18 + wLon * 0.15 + 15.0) * 0.5 + 0.5;
+                        const f3 = Math.sin(wLat * 0.25 + wLon * 0.22 + 20.0) * 0.5 + 0.5;
+                        const detailBoost = (f1 * 0.40 + f2 * 0.30 + f3 * 0.30) * 0.15;
+                        value += detailBoost * Math.min(value * 2.0, 1.0);
+                    }
+
+                    value = Math.max(0, Math.min(1, value));
+
+                    const idx = (py * w + px) * 4;
+                    pixels[idx] = 255;
+                    pixels[idx + 1] = 255;
+                    pixels[idx + 2] = 255;
+                    pixels[idx + 3] = Math.floor(value * 255);
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+            cloudSystem.texture.needsUpdate = true;
+            if (cloudSystem.material) {
+                cloudSystem.material.map = cloudSystem.texture;
+                cloudSystem.material.needsUpdate = true;
+            }
+            console.log('[Cloud] ✅ 程序化云纹理已生成');
+        }
+
+        // ============ 增强：尝试加载CDN真实卫星云图纹理 ============
+        function tryLoadRealCloudTexture() {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            let timedOut = false;
+            const timer = setTimeout(() => { timedOut = true; }, 8000);
+
+            img.onload = () => {
+                clearTimeout(timer);
+                if (timedOut) return;
+                try {
+                    const canvas = cloudSystem.canvas;
+                    const ctx = cloudSystem.ctx;
+                    // 直接覆盖画布
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    cloudSystem.texture.needsUpdate = true;
+                    if (cloudSystem.material) {
+                        cloudSystem.material.map = cloudSystem.texture;
+                        cloudSystem.material.needsUpdate = true;
+                    }
+                    cloudSystem._cdnLoaded = true;
+                    console.log('[Cloud] ✅ CDN真实卫星云图已覆盖');
+                    updateCloudStatus('☁️ 真实卫星云图 · 获取实时密度中...');
+                    // 纹理加载成功后再获取密度数据
+                    setTimeout(() => fetchCloudDensity(), 300);
+                } catch(e) {
+                    console.warn('[Cloud] CDN纹理绘制失败:', e.message);
+                }
+            };
+            // 两个备选URL
+            const urls = [
+                'https://threejs.org/examples/textures/planets/earth_clouds_1024.png',
+                'https://threejs.org/examples/textures/planets/cloud_1024.png'
+            ];
+            let urlIndex = 0;
+            img.onerror = () => {
+                urlIndex++;
+                if (urlIndex < urls.length) {
+                    img.src = urls[urlIndex];
+                } else {
+                    clearTimeout(timer);
+                    console.warn('[Cloud] 所有CDN纹理均不可达');
+                    updateCloudStatus('☁️ 程序化云图 · 获取实时密度中...');
+                    setTimeout(() => fetchCloudDensity(), 300);
+                }
+            };
+            img.src = urls[0];
+        }
+
+        // ============ 从 Open-Meteo 获取云密度数据并叠加 ============
+        async function fetchCloudDensity() {
+            // 防止同时多次请求
+            if (cloudSystem.isLoading) return;
+            const now = Date.now();
+            const lastFetch = cloudSystem._lastFetchTime || 0;
+            if (now - lastFetch < 60000) return; // 至少间隔60秒
+            cloudSystem.isLoading = true;
+            cloudSystem._lastFetchTime = now;
+
+            updateCloudStatus(cloudSystem._cdnLoaded
+                ? '☁️ 真实卫星云图 · 获取实时密度...'
+                : '☁️ 程序化云图 · 获取实时密度...');
+
+            try {
+                const allLatList = [], allLonList = [];
+                for (let i = 0; i < cloudSystem.gridLats.length; i++)
+                    for (let j = 0; j < cloudSystem.gridLons.length; j++) {
+                        allLatList.push(cloudSystem.gridLats[i]);
+                        allLonList.push(cloudSystem.gridLons[j]);
+                    }
+
+                const latStr = allLatList.join(',');
+                const lonStr = allLonList.join(',');
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${latStr}&longitude=${lonStr}&hourly=cloud_cover&forecast_hours=1&timezone=UTC`;
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                const resp = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!resp.ok) {
+                    if (resp.status === 429) {
+                        updateCloudStatus('☁️ API限流，1分钟后重试...');
+                        cloudSystem.isLoading = false;
+                        setTimeout(() => fetchCloudDensity(), 60000);
+                        return;
+                    }
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+
+                const data = await resp.json();
+                const results = Array.isArray(data) ? data : (data?.latitude !== undefined ? [data] : []);
+                if (results.length === 0) throw new Error('无数据');
+
+                // 构建网格查询表
+                const cloudGrid = {};
+                for (const item of results) {
+                    const lat = Math.round((typeof item.latitude === 'number' ? item.latitude : parseFloat(item.latitude)) / 10) * 10;
+                    const lon = Math.round((typeof item.longitude === 'number' ? item.longitude : parseFloat(item.longitude)) / 10) * 10;
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        cloudGrid[`${lat}_${lon}`] = item.hourly?.cloud_cover?.[0] ?? 50;
+                    }
+                }
+
+                // 叠加密度到画布纹理
+                applyDensityOverlay(cloudGrid);
+                cloudSystem.hasRealData = true;
+                cloudSystem.lastUpdateTime = new Date();
+                const ts = formatTimeForStatus(cloudSystem.lastUpdateTime);
+                console.log(`[Cloud] ✅ 云密度数据更新: ${ts}`);
+                updateCloudStatus(cloudSystem._cdnLoaded
+                    ? `☁️ 真实云图 · ${ts} · 每小时更新`
+                    : `☁️ 程序化云图 · ${ts} · 每小时更新`);
+
+            } catch (e) {
+                console.warn('[Cloud] 获取云密度失败:', e.message);
+                if (cloudSystem.lastUpdateTime) {
+                    updateCloudStatus(cloudSystem._cdnLoaded
+                        ? `☁️ 真实云图 · ${formatTimeForStatus(cloudSystem.lastUpdateTime)}`
+                        : `☁️ 程序化云图 · ${formatTimeForStatus(cloudSystem.lastUpdateTime)}`);
+                } else {
+                    updateCloudStatus(cloudSystem._cdnLoaded ? '☁️ 真实卫星云图' : '☁️ 程序化云图');
+                }
+            } finally {
+                cloudSystem.isLoading = false;
+            }
+        }
+
+        // 叠加密度：在现有纹理的基础上调整透明度
+        function applyDensityOverlay(cloudGrid) {
+            const canvas = cloudSystem.canvas;
+            if (!canvas) return;
+            const ctx = cloudSystem.ctx;
+            const w = canvas.width, h = canvas.height;
+            let imageData;
+            try {
+                imageData = ctx.getImageData(0, 0, w, h);
+            } catch(e) {
+                console.warn('[Cloud] 无法读取画布像素:', e.message);
+                return;
+            }
+            const pixels = imageData.data;
+            const lats = cloudSystem.gridLats;
+            const lons = cloudSystem.gridLons;
+
+            for (let py = 0; py < h; py++) {
+                const lat = 90 - (py / h) * 180;
+                for (let px = 0; px < w; px++) {
+                    const lon = (px / w) * 360 - 180;
+                    const idx = (py * w + px) * 4;
+
+                    // 查找最近的网格点（简化版双线性插值）
+                    let latIdx = 0;
+                    for (let i = 0; i < lats.length - 1; i++) {
+                        if (lat >= lats[i] && lat <= lats[i + 1]) { latIdx = i; break; }
+                    }
+                    let lonIdx = 0;
+                    for (let j = 0; j < lons.length - 1; j++) {
+                        if (lon >= lons[j] && lon <= lons[j + 1]) { lonIdx = j; break; }
+                    }
+
+                    const gl = (lt, ln) => cloudGrid[`${Math.round(lt/10)*10}_${Math.round(ln/10)*10}`] ?? 50;
+                    const lat0 = lats[latIdx], lat1 = lats[Math.min(latIdx+1, lats.length-1)];
+                    const lon0 = lons[lonIdx], lon1 = lons[(lonIdx+1) % lons.length];
+                    const v00 = gl(lat0,lon0), v10 = gl(lat1,lon0), v01 = gl(lat0,lon1), v11 = gl(lat1,lon1);
+                    const tx = ((lon - lon0 + 360) % 360) / ((lon1 - lon0 + 360) % 360 || 1);
+                    const ty = (lat - lat0) / (lat1 - lat0 || 1);
+                    let density = v00*(1-tx)*(1-ty) + v10*(1-tx)*ty + v01*tx*(1-ty) + v11*tx*ty;
+                    density = Math.max(0, Math.min(100, density)) / 100;
+
+                    // 用密度调整透明度：density=0 → 半透明，density=1 → 保持原样
+                    const factor = 0.4 + density * 0.6;
+                    pixels[idx + 3] = Math.min(255, Math.floor(pixels[idx + 3] * factor));
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            cloudSystem.texture.needsUpdate = true;
+            if (cloudSystem.material) {
+                cloudSystem.material.map = cloudSystem.texture;
+                cloudSystem.material.needsUpdate = true;
+            }
+        }
+
+        // ============ 工具函数 ============
+        function formatTimeForStatus(date) {
+            return [date.getHours(), date.getMinutes(), date.getSeconds()]
+                .map(n => n.toString().padStart(2, '0')).join(':');
+        }
+
+        function updateCloudStatus(text) {
+            const el = document.getElementById('cloud-status');
+            if (el) { el.textContent = text; el.style.display = cloudSystem.enabled ? 'block' : 'none'; }
+        }
+
+        // ============ 创建云层 ============
+        function createCloudLayer() {
+            const geometry = new THREE.SphereGeometry(1.012, 64, 64);
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            cloudSystem.canvas = canvas; cloudSystem.ctx = ctx;
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            cloudSystem.texture = texture;
+
+            const material = new THREE.MeshPhongMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.82,
+                blending: THREE.NormalBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            cloudSystem.material = material;
+
+            const sphere = new THREE.Mesh(geometry, material);
+            cloudSystem.sphere = sphere;
+            scene.add(sphere);
+
+            // 默认隐藏云层（从关闭状态开始）
+            sphere.visible = false;
+
+            // 第1步：立即生成程序化纹理（保证可见）
+            generateCloudTexture();
+            updateCloudStatus('☁️ 程序化云图 · 尝试加载真实纹理...');
+
+            // 第2步：异步尝试CDN真实云图（可选增强）
+            setTimeout(() => {
+                tryLoadRealCloudTexture();
+            }, 200);
+
+            // 第3步：每小时尝试更新密度数据
+            setInterval(() => {
+                if (!cloudSystem.isLoading) fetchCloudDensity();
+            }, cloudSystem.updateIntervalMs);
+        }
+
+        // ============ 云层开关 ============
+        document.getElementById('btnCloud').addEventListener('click', () => {
+            cloudSystem.enabled = !cloudSystem.enabled;
+            const btn = document.getElementById('btnCloud');
+            btn.textContent = cloudSystem.enabled ? '关闭云层' : '开启云层';
+            btn.classList.toggle('active', cloudSystem.enabled);
+            if (cloudSystem.sphere) cloudSystem.sphere.visible = cloudSystem.enabled;
+            if (cloudSystem.enabled) {
+                const t = cloudSystem.lastUpdateTime
+                    ? `☁️ 实时云 · ${formatTimeForStatus(cloudSystem.lastUpdateTime)} · 每小时更新`
+                    : '☁️ 卫星云图 · 加载中...';
+                updateCloudStatus(t);
+            } else {
+                updateCloudStatus('');
+            }
+        });
+
+        // 创建云层
+        createCloudLayer();
 
         // ====================== 经纬线网格 ======================
         const gridGroup = new THREE.Group();
@@ -1041,23 +980,15 @@
         })();
 
 
-        // ====================== 误差数据可视化 ======================
-        let currentData = null;
-
-        // 颜色映射：误差值 → 颜色 (0-15cm)
+        // ====================== 颜色映射（备用） ======================
         function errorToColor(error) {
             const t = Math.min(error / 15, 1);
             const color = new THREE.Color();
             // jet colormap: 蓝→青→绿→黄→红
-            if (t < 0.25) {
-                color.setRGB(0, t * 4, 1);
-            } else if (t < 0.5) {
-                color.setRGB(0, 1, 1 - (t - 0.25) * 4);
-            } else if (t < 0.75) {
-                color.setRGB((t - 0.5) * 4, 1, 0);
-            } else {
-                color.setRGB(1, 1 - (t - 0.75) * 4, 0);
-            }
+            if (t < 0.25) { color.setRGB(0, t * 4, 1);
+            } else if (t < 0.5) { color.setRGB(0, 1, 1 - (t - 0.25) * 4);
+            } else if (t < 0.75) { color.setRGB((t - 0.5) * 4, 1, 0);
+            } else { color.setRGB(1, 1 - (t - 0.75) * 4, 0); }
             return color;
         }
 
@@ -1158,105 +1089,17 @@
             return 0.10 * vtec * slant_factor;
         }
 
-        // GloTEC 数据插值器
-        let tecInterpolator = null;
-        let glotecRawData = null;
-
-        // 从本地文件加载 GloTEC 数据
-        async function loadGlotecData() {
-            // 优先使用 Android 桥接数据
-            if (window.AndroidBridge && AndroidBridge.getGlotecData) {
-                try {
-                    const raw = AndroidBridge.getGlotecData();
-                    if (raw) {
-                        glotecRawData = JSON.parse(raw);
-                        console.log('[Info] GloTEC 数据加载成功 (Android 桥接)');
-                        return true;
-                    }
-                } catch (e) {
-                    console.warn('[Warning] Android 桥接获取 GloTEC 失败:', e);
-                }
+        // TEC 插值器（使用纬度依赖模型，不再依赖外部 GloTEC 数据）
+        let tecInterpolator = {
+            getVtec: function(lat, lon) {
+                const latRad = lat * Math.PI / 180;
+                const baseTec = 30 + 30 * Math.pow(Math.cos(latRad), 2);
+                const lonRad = lon * Math.PI / 180;
+                const variation = 10 * Math.sin(2 * lonRad) * Math.cos(latRad);
+                return Math.max(5, baseTec + variation);
             }
-            try {
-                const response = await fetch('glotec_data.geojson');
-                if (response.ok) {
-                    glotecRawData = await response.json();
-                    console.log('[Info] GloTEC 数据加载成功');
-                    return true;
-                }
-            } catch (e) {
-                console.warn('[Warning] 无法加载本地 GloTEC 数据:', e);
-            }
-            return false;
-        }
-
-        // 初始化 TEC 插值器（使用真实的 GloTEC 数据）
-        function initTecInterpolator() {
-            if (glotecRawData && glotecRawData.features) {
-                // 解析 GloTEC 数据
-                const points = [];
-                for (const feature of glotecRawData.features) {
-                    const [lon, lat] = feature.geometry.coordinates;
-                    const tec = feature.properties.tec;
-                    points.push({ lat, lon, tec });
-                }
-
-                // 获取唯一的经纬度
-                const lats = [...new Set(points.map(p => p.lat))].sort((a, b) => a - b);
-                const lons = [...new Set(points.map(p => p.lon))].sort((a, b) => a - b);
-
-                // 构建 TEC 网格
-                const tecGrid = {};
-                points.forEach(p => {
-                    tecGrid[`${p.lat}_${p.lon}`] = p.tec;
-                });
-
-                // 双线性插值函数
-                tecInterpolator = {
-                    getVtec: function(lat, lon) {
-                        // 找到最近的四个点
-                        let latIdx = lats.findIndex(l => l >= lat);
-                        let lonIdx = lons.findIndex(l => l >= lon);
-
-                        if (latIdx < 0) latIdx = lats.length - 1;
-                        if (lonIdx < 0) lonIdx = lons.length - 1;
-                        if (latIdx === 0) latIdx = 1;
-                        if (lonIdx === 0) lonIdx = 1;
-
-                        const lat0 = lats[latIdx - 1], lat1 = lats[latIdx];
-                        const lon0 = lons[lonIdx - 1], lon1 = lons[lonIdx];
-
-                        // 获取四个角的 TEC 值
-                        const e00 = tecGrid[`${lat0}_${lon0}`] || 30;
-                        const e10 = tecGrid[`${lat1}_${lon0}`] || 30;
-                        const e01 = tecGrid[`${lat0}_${lon1}`] || 30;
-                        const e11 = tecGrid[`${lat1}_${lon1}`] || 30;
-
-                        // 双线性插值
-                        const tx = (lon - lon0) / (lon1 - lon0);
-                        const ty = (lat - lat0) / (lat1 - lat0);
-
-                        return e00 * (1 - tx) * (1 - ty) +
-                               e10 * (1 - tx) * ty +
-                               e01 * tx * (1 - ty) +
-                               e11 * tx * ty;
-                    }
-                };
-                console.log('[Info] TEC 插值器初始化完成，数据点:', points.length);
-            } else {
-                // 使用简单的纬度依赖模型作为后备
-                tecInterpolator = {
-                    getVtec: function(lat, lon) {
-                        const latRad = lat * Math.PI / 180;
-                        const baseTec = 30 + 30 * Math.pow(Math.cos(latRad), 2);
-                        const lonRad = lon * Math.PI / 180;
-                        const variation = 10 * Math.sin(2 * lonRad) * Math.cos(latRad);
-                        return Math.max(5, baseTec + variation);
-                    }
-                };
-                console.log('[Info] 使用默认 TEC 模型');
-            }
-        }
+        };
+        console.log('[Info] 使用默认 TEC 模型（GloTEC 数据已移除）');
 
         // 计算指定高度的全球误差网格
         function calculateErrorGrid(height_km, latCount = 30, lonCount = 60) {
@@ -1325,217 +1168,10 @@
             };
         }
 
-        // 初始化（加载数据并初始化插值器）
-        async function initializeApp() {
-            await loadGlotecData();
-            initTecInterpolator();
-            console.log('[Info] TEC 数据初始化完成');
-        }
-
-        // 启动初始化
-        initializeApp();
-
-        // ====================== 热力图可视化系统 ======================
-        let errorVisualizationGroup = new THREE.Group();
-        scene.add(errorVisualizationGroup);
-        let labelGroup = new THREE.Group();
-        scene.add(labelGroup);
-        let isExpandedMode = false; // false=叠加(真实半径), true=分层展开(固定间距)
-        let currentErrorData = null;
-        let errorMesh = null;
-
-        // 清除热力图
-        function clearErrorVisualization() {
-            while (errorVisualizationGroup.children.length > 0) {
-                const child = errorVisualizationGroup.children[0];
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) {
-                    if (child.material.map) child.material.map.dispose();
-                    child.material.dispose();
-                }
-                errorVisualizationGroup.remove(child);
-            }
-            errorMesh = null;
-
-            // 清除文字标注
-            clearLabels();
-        }
-
-        // 清除文字标注
-        function clearLabels() {
-            while (labelGroup.children.length > 0) {
-                const child = labelGroup.children[0];
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) {
-                    if (child.material.map) child.material.map.dispose();
-                    child.material.dispose();
-                }
-                labelGroup.remove(child);
-            }
-        }
-
-        // 创建文字精灵标注
-        function createTextSprite(text, position, color = '#ffffff', fontSize = 48) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 512;
-            canvas.height = 128;
-
-            // 背景
-            context.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            context.roundRect(10, 10, canvas.width - 20, canvas.height - 20, 15);
-            context.fill();
-
-            // 边框
-            context.strokeStyle = color;
-            context.lineWidth = 3;
-            context.roundRect(10, 10, canvas.width - 20, canvas.height - 20, 15);
-            context.stroke();
-
-            // 文字
-            context.font = `bold ${fontSize}px Arial`;
-            context.fillStyle = color;
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(text, canvas.width / 2, canvas.height / 2);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.needsUpdate = true;
-
-            const spriteMaterial = new THREE.SpriteMaterial({
-                map: texture,
-                transparent: true,
-                depthTest: false,
-                depthWrite: false
-            });
-
-            const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.position.copy(position);
-            sprite.scale.set(0.3, 0.075, 1);
-
-            return sprite;
-        }
-
-        // 在分层展开模式下添加高度标注
-        function addHeightLabels() {
-            clearLabels();
-
-            if (!isExpandedMode || !allHeightData) return;
-
-            // Y轴偏移量，让标签上下错落分布
-            const yOffset = [0.12, -0.05, 0.08, -0.10];
-
-            // 为每一层添加标注
-            allHeightData.forEach((data, index) => {
-                const radius = 1.15 + index * 0.15;
-
-                // 在球体右侧（经度0度方向）添加标注，紧贴球面，上下错落
-                const labelPosition = new THREE.Vector3(
-                    radius * 1.02,  // 紧贴球面
-                    yOffset[index % yOffset.length],  // 上下错落
-                    0
-                );
-
-                // 根据高度选择颜色
-                const colors = ['#ff4444', '#ffaa44', '#00ff88', '#00bfff'];
-                const color = colors[index % colors.length];
-
-                const label = createTextSprite(
-                    `${data.orbit_height_km.toFixed(0)} km`,
-                    labelPosition,
-                    color
-                );
-
-                labelGroup.add(label);
-            });
-        }
-
-        // ====================== 星云效果（优化版） ======================
-        function createNebulaLayer(data, radius = 1.005, layerIndex = 0) {
-            const points = data.points;
-
-            // 构建误差网格用于插值
-            const lats = [...new Set(points.map(p => p.lat))].sort((a,b) => a-b);
-            const lons = [...new Set(points.map(p => p.lon))].sort((a,b) => a-b);
-            const errorGrid = {};
-            points.forEach(p => { errorGrid[`${p.lat}_${p.lon}`] = p.error; });
-
-            // 降低细分度以提升性能（64段而非128段）
-            const segments = 64;
-            const geometry = new THREE.SphereGeometry(radius, segments, segments);
-
-            // 为每个顶点计算对应位置的误差值并设置颜色
-            const posAttr = geometry.attributes.position;
-            const colors = new Float32Array(posAttr.count * 3);
-
-            for (let i = 0; i < posAttr.count; i++) {
-                const x = posAttr.getX(i);
-                const y = posAttr.getY(i);
-                const z = posAttr.getZ(i);
-
-                // 球面坐标 → 经纬度
-                const r = Math.sqrt(x*x + y*y + z*z);
-                const lat = 90 - Math.acos(y / r) * 180 / Math.PI;
-                let lon = Math.atan2(z, -x) * 180 / Math.PI;
-                if (lon < -180) lon += 360;
-                if (lon > 180) lon -= 360;
-
-                // 双线性插值获取误差值
-                let error = 0;
-                const latIdx = lats.findIndex(l => l >= lat);
-                const lonIdx = lons.findIndex(l => l >= lon);
-                if (latIdx > 0 && lonIdx > 0) {
-                    const lat0 = lats[latIdx-1], lat1 = lats[latIdx];
-                    const lon0 = lons[lonIdx-1], lon1 = lons[lonIdx];
-                    const e00 = errorGrid[`${lat0}_${lon0}`] || 0;
-                    const e10 = errorGrid[`${lat1}_${lon0}`] || 0;
-                    const e01 = errorGrid[`${lat0}_${lon1}`] || 0;
-                    const e11 = errorGrid[`${lat1}_${lon1}`] || 0;
-                    const tx = (lon - lon0) / (lon1 - lon0);
-                    const ty = (lat - lat0) / (lat1 - lat0);
-                    error = e00*(1-tx)*(1-ty) + e10*(1-tx)*ty + e01*tx*(1-ty) + e11*tx*ty;
-                }
-
-                const color = errorToColor(error);
-                colors[i*3] = color.r;
-                colors[i*3+1] = color.g;
-                colors[i*3+2] = color.b;
-            }
-
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-            // 简化着色器 - 使用 MeshPhongMaterial 替代复杂自定义着色器
-            const material = new THREE.MeshPhongMaterial({
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.25,
-                shininess: 20,
-                specular: new THREE.Color(0x111111),
-                emissive: new THREE.Color(0x000000),
-                emissiveIntensity: 0.1,
-                side: THREE.DoubleSide,
-                depthWrite: false
-            });
-
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.userData.layerIndex = layerIndex;
-            errorVisualizationGroup.add(mesh);
-
-            return mesh;
-        }
-
-        // ====================== 统一创建入口（单层） ======================
-        function createErrorVisualization(data) {
-            clearErrorVisualization();
-            currentErrorData = data;
-            const orbitRadius = 1 + data.orbit_height_km / 6371;
-            const radius = isExpandedMode ? orbitRadius * 2 : orbitRadius;
-            createNebulaLayer(data, radius);
-        }
+        // 初始化（TEC 插值器已内联初始化，无需同步加载）
+        console.log('[Info] TEC 数据初始化完成（GloTEC 已移除）');
 
         // ====================== 加载数据 ======================
-        let allHeightData = null;
-
         async function loadData() {
             try {
                 // 优先使用 Android 桥接数据
@@ -1556,81 +1192,13 @@
                     rawData = await response.json();
                 }
 
-                const keys = Object.keys(rawData);
-                const isNewFormat = keys.some(k => k.startsWith('height_'));
-
-                if (isNewFormat) {
-                    allHeightData = keys
-                        .filter(k => k.startsWith('height_'))
-                        .sort((a, b) => {
-                            const hA = parseInt(a.split('_')[1]);
-                            const hB = parseInt(b.split('_')[1]);
-                            return hA - hB;
-                        })
-                        .map(k => rawData[k]);
-                    currentData = allHeightData[0];
-                    currentErrorData = currentData;
-                } else {
-                    allHeightData = null;
-                    currentData = rawData[keys[0]];
-                    currentErrorData = currentData;
-                }
-
-                // 热力图默认关闭，不显示
-                if (isHeatmapVisible) createAllHeatmaps();
-
             } catch (e) {
                 console.error('加载数据失败:', e);
                 alert('数据加载失败，请检查 orbit_error_3d_data.json 文件是否存在！');
             }
         }
 
-        // ====================== 同时显示所有高度热力图 ======================
-        function createAllHeatmaps() {
-            clearErrorVisualization();
-            if (allHeightData && allHeightData.length > 0) {
-                allHeightData.forEach((data, index) => {
-                    const orbitRadius = 1 + data.orbit_height_km / 6371;
-                    // 展开模式：四层固定间距，从侧面看清晰可辨
-                    const radius = isExpandedMode ? (1.15 + index * 0.15) : orbitRadius;
-                    createNebulaLayer(data, radius, index);
-                });
-
-                // 在分层展开模式下添加高度标注
-                if (isExpandedMode) {
-                    addHeightLabels();
-                }
-            } else if (currentErrorData) {
-                createErrorVisualization(currentErrorData);
-            }
-        }
-
         // ====================== 交互控制 ======================
-        let isHeatmapVisible = false;
-
-        // 热力图开关
-        const btnHeatMode = document.getElementById('btnHeatMode');
-        document.getElementById('btnHeatmap').addEventListener('click', () => {
-            isHeatmapVisible = !isHeatmapVisible;
-            const btn = document.getElementById('btnHeatmap');
-            btn.classList.toggle('active', isHeatmapVisible);
-            btnHeatMode.style.display = isHeatmapVisible ? 'inline-block' : 'none';
-            if (isHeatmapVisible) {
-                btnHeatMode.textContent = isExpandedMode ? '恢复叠加' : '分层展开';
-                createAllHeatmaps();
-            } else {
-                clearErrorVisualization();
-            }
-        });
-
-        // 热力图视图模式切换（叠加 / 分层展开）
-        btnHeatMode.addEventListener('click', () => {
-            isExpandedMode = !isExpandedMode;
-            btnHeatMode.textContent = isExpandedMode ? '恢复叠加' : '分层展开';
-            if (isHeatmapVisible) {
-                createAllHeatmaps();
-            }
-        });
 
         // 网格开关
         let isGridVisible = true;
@@ -1751,8 +1319,6 @@
         // 轨道信息标注
         let orbitInfoSprite = null;
         let orbitInfoCanvas = null;
-        let isOrbitLineVisible = true;
-        let isOrbitInfoVisible = true;
 
         // 获取当前显示半径
         function getDisplayRadius() {
@@ -1790,7 +1356,7 @@
                 color: 0x00ffff, transparent: true, opacity: 0.6
             });
             satelliteOrbit = new THREE.Line(geometry, material);
-            satelliteOrbit.visible = isOrbitLineVisible;
+            satelliteOrbit.visible = true;
             scene.add(satelliteOrbit);
         }
 
@@ -1883,7 +1449,7 @@
                 orbitInfoSprite.scale.set(0.55, 0.14, 1);
                 const inc = THREE.MathUtils.degToRad(ORBIT_INCLINATION);
                 orbitInfoSprite.position.set(displayRadius + 0.15, displayRadius * Math.sin(inc) * 0.7 + 0.1, 0);
-                orbitInfoSprite.visible = isOrbitInfoVisible;
+                orbitInfoSprite.visible = true;
                 scene.add(orbitInfoSprite);
             }
         }
@@ -1898,25 +1464,6 @@
             }
         }
 
-        // ====================== 新增控制按钮事件 ======================
-        // 轨道线显示/隐藏
-        document.getElementById('btnOrbitLine').addEventListener('click', () => {
-            isOrbitLineVisible = !isOrbitLineVisible;
-            const btn = document.getElementById('btnOrbitLine');
-            btn.textContent = isOrbitLineVisible ? '隐藏轨道线' : '显示轨道线';
-            btn.classList.toggle('active', isOrbitLineVisible);
-            if (satelliteOrbit) satelliteOrbit.visible = isOrbitLineVisible;
-        });
-
-        // 轨道信息标注显示/隐藏
-        document.getElementById('btnOrbitInfo').addEventListener('click', () => {
-            isOrbitInfoVisible = !isOrbitInfoVisible;
-            const btn = document.getElementById('btnOrbitInfo');
-            btn.textContent = isOrbitInfoVisible ? '隐藏轨道信息' : '显示轨道信息';
-            btn.classList.toggle('active', isOrbitInfoVisible);
-            if (orbitInfoSprite) orbitInfoSprite.visible = isOrbitInfoVisible;
-        });
-
         // LEO轨道展开/正常视图切换
         document.getElementById('btnOrbitScale').addEventListener('click', () => {
             isOrbitExpanded = !isOrbitExpanded;
@@ -1930,146 +1477,210 @@
                 const inc = THREE.MathUtils.degToRad(ORBIT_INCLINATION);
                 orbitInfoSprite.position.set(displayRadius + 0.15, displayRadius * Math.sin(inc) * 0.7 + 0.1, 0);
             }
+            // 重新绘制所有已选卫星的轨道线（各星座）
+            if (selectedSats.size > 0) {
+                for (const [index, sel] of selectedSats) {
+                    const cfg = CONSTELLATIONS.find(c => c.id === sel.constId);
+                    const satrec = cfg ? cfg.satrecs[index] : null;
+                    if (!satrec) continue;
+                    if (sel.orbitLine) {
+                        scene.remove(sel.orbitLine);
+                        sel.orbitLine.geometry.dispose();
+                        sel.orbitLine.material.dispose();
+                    }
+                    sel.orbitLine = drawSatOrbit(satrec);
+                }
+            }
         });
 
-        // ====================== 千帆星座卫星模块 (Sprite 方案) ======================
-        let qianfanGroup = null;       // THREE.Group，包含所有卫星 Sprite
-        let qianfanSprites = [];       // Sprite 数组，索引对应 satrecs
-        let qianfanSatrecs = [];
-        let qianfanVisible = false;
-        let qianfanDotTexture = null;  // 共享的发光圆点纹理
+        // ====================== 多星座系统 ======================
+        // 定义所有星座
+        const CONSTELLATIONS = [
+            {
+                id: 'qianfan',  label: '千帆星座',  color: '#ff8800',
+                celestrakName: 'QIANFAN',
+                group: null, sprites: [], satrecs: [], visible: false,
+                dotTexture: null, btnId: 'btnQianfan', initColor: '#ff8800'
+            },
+            {
+                id: 'gw',  label: 'GW星座',  color: '#00ddff',
+                celestrakName: 'GW',
+                group: null, sprites: [], satrecs: [], visible: false,
+                dotTexture: null, btnId: 'btnGW', initColor: '#00ddff'
+            },
+            {
+                id: 'jilin',  label: '吉林一号',  color: '#44ff88',
+                celestrakName: 'JILIN',
+                group: null, sprites: [], satrecs: [], visible: false,
+                dotTexture: null, btnId: 'btnJilin', initColor: '#44ff88'
+            },
+            {
+                id: 'tianzhi',  label: '天智系列',  color: '#ff66aa',
+                celestrakName: 'TIANZHI',
+                group: null, sprites: [], satrecs: [], visible: false,
+                dotTexture: null, btnId: 'btnTianzhi', initColor: '#ff66aa'
+            }
+        ];
 
-        // 创建发光圆点纹理（只需创建一次）
-        function createDotTexture() {
+        // 创建各星座圆点纹理（不同颜色）
+        function createConstellationDotTexture(color) {
             const c = document.createElement('canvas');
             c.width = 32; c.height = 32;
             const ctx = c.getContext('2d');
-            ctx.fillStyle = '#ff8800';
+            ctx.fillStyle = color;
             ctx.beginPath();
             ctx.arc(16, 16, 10, 0, Math.PI * 2);
+            ctx.fill();
+            // 光晕效果
+            const grad = ctx.createRadialGradient(16, 16, 4, 16, 16, 16);
+            grad.addColorStop(0, color);
+            grad.addColorStop(0.5, color + '88');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(16, 16, 16, 0, Math.PI * 2);
             ctx.fill();
             const tex = new THREE.CanvasTexture(c);
             tex.needsUpdate = true;
             return tex;
         }
 
-        // 从 Celestrak 获取千帆 TLE（通过 Android 桥接）
-        async function fetchQianfanTLE() {
-            if (window.AndroidBridge && AndroidBridge.getQianfanTLE) {
+        // 从 Celestrak 获取 TLE（通过 Android 桥接）
+        async function fetchTLE(name) {
+            if (window.AndroidBridge && AndroidBridge['get' + name + 'TLE']) {
                 try {
-                    const raw = AndroidBridge.getQianfanTLE();
-                    if (raw && raw.startsWith('QIANFAN')) {
-                        console.log('[Qianfan] 通过 Android 桥接获取 TLE 数据');
+                    const raw = AndroidBridge['get' + name + 'TLE']();
+                    if (raw && raw.startsWith(name)) {
+                        console.log(`[${name}] 通过 Android 桥接获取 TLE 数据`);
                         return raw;
                     }
                 } catch (e) {
-                    console.warn('[Qianfan] Android 桥接获取失败:', e);
+                    console.warn(`[${name}] Android 桥接获取失败:`, e);
                 }
             }
             try {
-                const resp = await fetch('https://celestrak.org/NORAD/elements/gp.php?NAME=QIANFAN&FORMAT=tle');
+                const resp = await fetch(`https://celestrak.org/NORAD/elements/gp.php?NAME=${name}&FORMAT=tle`);
                 if (resp.ok) {
                     const text = await resp.text();
-                    if (text.startsWith('QIANFAN')) return text;
+                    if (text.startsWith(name)) return text;
                 }
             } catch (e) {
-                console.warn('[Qianfan] 直接 fetch 失败:', e);
+                console.warn(`[${name}] 直接 fetch 失败:`, e);
             }
             return null;
         }
 
-        // 解析 TLE 文本，创建 satrec 数组
-        function parseQianfanTLE(tleText) {
+        // 解析 TLE 文本为 satrec 数组
+        function parseTLE(tleText) {
             const lines = tleText.trim().split('\n').map(l => l.trimEnd());
             const satrecs = [];
             for (let i = 0; i < lines.length - 2; i += 3) {
                 const name = lines[i];
                 const line1 = lines[i + 1];
                 const line2 = lines[i + 2];
-                if (line1.startsWith('1 ') && line2.startsWith('2 ')) {
+                if (line1 && line1.startsWith('1 ') && line2 && line2.startsWith('2 ')) {
                     try {
                         const satrec = satellite.twoline2satrec(line1, line2);
                         satrec.name = name;
                         satrecs.push(satrec);
-                    } catch (e) { /* 跳过 */ }
+                    } catch (e) { /* 跳过解析失败的 */ }
                 }
             }
             return satrecs;
         }
 
-        // 创建卫星 Sprite 群组
-        function createQianfanSprites(satrecs) {
-            if (!qianfanDotTexture) qianfanDotTexture = createDotTexture();
+        // 为某个星座创建 Sprite 群组（基于其配置）
+        function createConstellationSprites(cfg) {
+            if (!cfg.dotTexture) cfg.dotTexture = createConstellationDotTexture(cfg.color);
             const group = new THREE.Group();
             const sprites = [];
             const material = new THREE.SpriteMaterial({
-                map: qianfanDotTexture,
+                map: cfg.dotTexture,
                 transparent: true,
                 depthWrite: false,
                 blending: THREE.AdditiveBlending
             });
-
-            for (let i = 0; i < satrecs.length; i++) {
+            for (let i = 0; i < cfg.satrecs.length; i++) {
                 const sprite = new THREE.Sprite(material.clone());
                 sprite.scale.set(0.03, 0.03, 1);
                 sprite.userData.satIndex = i;
+                sprite.userData.constId = cfg.id;
                 sprite.userData.selected = false;
-                sprite.position.set(9999, 9999, 9999); // 初始不可见
+                sprite.position.set(9999, 9999, 9999);
                 group.add(sprite);
                 sprites.push(sprite);
             }
-
             group.rotation.y = earth.rotation.y;
             return { group, sprites };
         }
 
-        // 更新所有卫星 Sprite 位置（每帧调用）
-        function updateQianfanPositions(now) {
-            if (!qianfanSprites.length || !qianfanSatrecs.length) return;
+        // 更新某星座所有卫星位置（每帧调用）
+        function updateConstellationPositions(cfg, now) {
+            if (!cfg.visible || !cfg.sprites.length || !cfg.satrecs.length) return;
             const gmst = satellite.gstime(now);
-
-            for (let i = 0; i < qianfanSatrecs.length; i++) {
-                const satrec = qianfanSatrecs[i];
-                const sprite = qianfanSprites[i];
+            for (let i = 0; i < cfg.satrecs.length; i++) {
+                const satrec = cfg.satrecs[i];
+                const sprite = cfg.sprites[i];
                 const posVel = satellite.propagate(satrec, now);
-
                 if (posVel.position) {
                     const gd = satellite.eciToGeodetic(posVel.position, gmst);
-                    const r = 1.0 + gd.height / 6371.0;
+                    const r = (1.0 + gd.height / 6371.0) * orbitScaleFactor;
                     const phi = Math.PI / 2 - gd.latitude;
                     const theta = gd.longitude + Math.PI;
-                    sprite.position.set(
-                        -r * Math.sin(phi) * Math.cos(theta),
-                        r * Math.cos(phi),
-                        r * Math.sin(phi) * Math.sin(theta)
-                    );
-                    // 选中的卫星保持呼吸大小，未选中的用固定大小
-                    if (!sprite.userData.selected) {
-                        sprite.scale.set(0.03, 0.03, 1);
-                    }
+                    sprite.position.set(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+                    if (!sprite.userData.selected) sprite.scale.set(0.03, 0.03, 1);
                 } else {
                     sprite.position.set(9999, 9999, 9999);
                 }
             }
         }
 
-        // 初始化千帆星座（默认加载）
-        async function initQianfanConstellation() {
-            const tleText = await fetchQianfanTLE();
-            if (!tleText) { console.error('[Qianfan] 无法获取 TLE 数据'); return; }
-
-            qianfanSatrecs = parseQianfanTLE(tleText);
-            console.log(`[Qianfan] 解析到 ${qianfanSatrecs.length} 颗卫星`);
-            if (qianfanSatrecs.length === 0) return;
-
-            const { group, sprites } = createQianfanSprites(qianfanSatrecs);
-            qianfanGroup = group;
-            qianfanSprites = sprites;
-            scene.add(qianfanGroup);
-            qianfanVisible = true;
-
-            updateQianfanPositions(new Date());
+        // 初始化单个星座
+        async function initConstellation(cfg) {
+            const tleText = await fetchTLE(cfg.celestrakName);
+            if (!tleText) {
+                console.warn(`[${cfg.id}] 无法获取 TLE 数据`);
+                return;
+            }
+            cfg.satrecs = parseTLE(tleText);
+            console.log(`[${cfg.id}] 解析到 ${cfg.satrecs.length} 颗卫星`);
+            if (cfg.satrecs.length === 0) return;
+            const { group, sprites } = createConstellationSprites(cfg);
+            cfg.group = group;
+            cfg.sprites = sprites;
+            scene.add(cfg.group);
+            cfg.visible = true;
+            updateConstellationPositions(cfg, new Date());
         }
+
+        // 翻转星座显示状态（按钮回调）
+        function toggleConstellation(cfg) {
+            cfg.visible = !cfg.visible;
+            const btn = document.getElementById(cfg.btnId);
+            btn.textContent = cfg.visible ? cfg.label : cfg.label.replace('', '');
+            btn.classList.toggle('active', cfg.visible);
+            if (cfg.group) cfg.group.visible = cfg.visible;
+        }
+
+        // 批量初始化所有星座
+        async function initAllConstellations() {
+            await Promise.all(CONSTELLATIONS.map(cfg => initConstellation(cfg)));
+            // 设置按钮事件
+            CONSTELLATIONS.forEach(cfg => {
+                document.getElementById(cfg.btnId).addEventListener('click', () => toggleConstellation(cfg));
+            });
+            // 默认千帆选中——保持千帆卫星的 selectedSats 逻辑兼容
+            // 把所有千帆 satrec 放入 qianfanSatrecs 引用（兼容旧代码）
+            const qf = CONSTELLATIONS.find(c => c.id === 'qianfan');
+            if (qf) {
+                qianfanSatrecs = qf.satrecs;
+                qianfanSprites = qf.sprites;
+                qianfanGroup = qf.group;
+                qianfanVisible = qf.visible;
+            }
+        }
+        // 千帆兼容引用（供 selectSat / deselectSat / sat 仪表盘使用）
+        let qianfanGroup = null, qianfanSprites = [], qianfanSatrecs = [], qianfanVisible = false, qianfanDotTexture = null;
 
         // ====================== 右侧标签页切换 ======================
         document.querySelectorAll('.right-tab-btn').forEach(btn => {
@@ -2158,14 +1769,18 @@
             // 添加新卡片
             for (const [index, sel] of selectedSats) {
                 if (!document.getElementById('sat-card-' + index)) {
-                    const card = createSatCard(qianfanSatrecs[index], index);
-                    if (card) container.appendChild(card);
+                    const cfg = CONSTELLATIONS.find(c => c.id === sel.constId);
+                    const satrec = cfg ? cfg.satrecs[index] : null;
+                    if (satrec) {
+                        const card = createSatCard(satrec, index);
+                        if (card) container.appendChild(card);
+                    }
                 }
             }
         }
 
         // ====================== 卫星点击选中/轨道显示 ======================
-        const selectedSats = new Map(); // Map<index, {orbitLine}>
+        const selectedSats = new Map(); // Map<index, {orbitLine, constId}>
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
@@ -2177,9 +1792,14 @@
                 sel.orbitLine.geometry.dispose();
                 sel.orbitLine.material.dispose();
             }
-            if (qianfanSprites[index]) {
-                qianfanSprites[index].userData.selected = false;
-                qianfanSprites[index].scale.set(0.03, 0.03, 1);
+            // 在所有星座中取消选中标记
+            for (const cfg of CONSTELLATIONS) {
+                const sprite = cfg.sprites[index];
+                if (sprite) {
+                    sprite.userData.selected = false;
+                    sprite.scale.set(0.03, 0.03, 1);
+                    break;
+                }
             }
             selectedSats.delete(index);
         }
@@ -2203,7 +1823,7 @@
                 const pv = satellite.propagate(satrec, t);
                 if (pv.position) {
                     const gd = satellite.eciToGeodetic(pv.position, satellite.gstime(t));
-                    const r = 1.0 + gd.height / 6371.0;
+                    const r = (1.0 + gd.height / 6371.0) * orbitScaleFactor;
                     const phi = Math.PI / 2 - gd.latitude;
                     const theta = gd.longitude + Math.PI;
                     points.push(new THREE.Vector3(
@@ -2225,21 +1845,25 @@
         // 处理卫星点击（Sprite 射线检测，精确匹配屏幕位置）
         function onSatelliteClick(event) {
             if (event.target !== renderer.domElement) return; // 只响应 canvas 点击
-            if (!qianfanVisible || !qianfanGroup) return;
+
+            // 收集所有可见星座的 sprite
+            const allSprites = [];
+            CONSTELLATIONS.forEach(cfg => { if (cfg.visible && cfg.sprites.length) allSprites.push(...cfg.sprites); });
+            if (allSprites.length === 0) return;
 
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(qianfanSprites, false);
-
+            const intersects = raycaster.intersectObjects(allSprites, false);
             if (intersects.length === 0) return;
 
-            // 取第一个命中的 Sprite（按深度排序，最近的在前）
             const hitSprite = intersects[0].object;
             const idx = hitSprite.userData.satIndex;
-            if (idx === undefined || idx < 0 || idx >= qianfanSatrecs.length) return;
+            const constId = hitSprite.userData.constId;
+            const cfg = CONSTELLATIONS.find(c => c.id === constId);
+            if (!cfg || idx === undefined || idx < 0 || idx >= cfg.satrecs.length) return;
 
             // 跳过传播失败的卫星（位置在远处）
             if (Math.abs(hitSprite.position.x) > 100) return;
@@ -2249,11 +1873,11 @@
                 deselectSat(idx);
             } else {
                 // 选中新卫星
-                const satrec = qianfanSatrecs[idx];
+                const satrec = cfg.satrecs[idx];
                 if (!satrec) return;
                 hitSprite.userData.selected = true;
                 const orbitLine = drawSatOrbit(satrec);
-                selectedSats.set(idx, { orbitLine });
+                selectedSats.set(idx, { orbitLine, constId });
             }
             // 自动切换到卫星仪表盘并更新卡片
             switchToSatTab();
@@ -2265,7 +1889,7 @@
         });
 
         // 启动时自动加载千帆星座
-        initQianfanConstellation();
+        initAllConstellations();
 
         // ====================== 动画循环 ======================
         let lastFrameTime = performance.now();
@@ -2293,33 +1917,27 @@
             // 卫星轨道动画
             updateSatellitePosition();
 
-            // 星云着色器时间始终更新
-            const animTime = currentTime / 1000;
-            if (errorVisualizationGroup) {
-                errorVisualizationGroup.children.forEach(child => {
-                    if (child.material && child.material.uniforms && child.material.uniforms.time) {
-                        child.material.uniforms.time.value = animTime;
-                    }
-                });
-            }
+            // 更新所有星座卫星位置
+            CONSTELLATIONS.forEach(cfg => {
+                if (cfg.visible && cfg.group) {
+                    updateConstellationPositions(cfg, new Date());
+                    cfg.group.rotation.y = earth.rotation.y;
+                }
+            });
 
-            // 更新千帆卫星位置
-            if (qianfanVisible && qianfanGroup) {
-                updateQianfanPositions(new Date());
-                qianfanGroup.rotation.y = earth.rotation.y;
-
-                // 呼吸闪烁 + 同步选中卫星的轨道线和信息标注
-                if (selectedSats.size > 0) {
-                    const breath = 0.02 + 0.04 * (0.5 + 0.5 * Math.sin(currentTime / 400));
-                    for (const [index, sel] of selectedSats) {
-                        // 呼吸效果：选中卫星 Sprite 大小在 0.02~0.06 之间变化
-                        const sprite = qianfanSprites[index];
+            // 呼吸闪烁（选中卫星）+ 轨道线跟随地球
+            if (selectedSats.size > 0) {
+                const breath = 0.02 + 0.04 * (0.5 + 0.5 * Math.sin(currentTime / 400));
+                for (const [index, sel] of selectedSats) {
+                    // 在所有星座中查找选中的卫星
+                    for (const cfg of CONSTELLATIONS) {
+                        const sprite = cfg.sprites[index];
                         if (sprite && sprite.userData.selected) {
                             sprite.scale.set(breath, breath, 1);
+                            break;
                         }
-                        // 轨道线跟随地球旋转
-                        if (sel.orbitLine) sel.orbitLine.rotation.y = earth.rotation.y;
                     }
+                    if (sel.orbitLine) sel.orbitLine.rotation.y = earth.rotation.y;
                 }
             }
 
@@ -2331,19 +1949,19 @@
 
         // 窗口自适应
         window.addEventListener('resize', () => {
-            const sceneArea = document.getElementById('scene-area');
-            const w = sceneArea.clientWidth;
-            const h = sceneArea.clientHeight;
-            camera.aspect = w / h;
-            camera.updateProjectionMatrix();
-            renderer.setSize(w, h);
+            const r = document.getElementById('scene-area').getBoundingClientRect();
+            const w = r.width;
+            const h = r.height;
+            if (w > 0 && h > 0) {
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            }
         });
 
         // 启动应用
         async function startApp() {
-            // 加载 GloTEC 数据
-            await loadGlotecData();
-            initTecInterpolator();
+            // TEC 插值器已在声明时初始化，无需加载 GloTEC 数据
 
             // 加载预计算数据（动画已在底部启动）
             await loadData();
@@ -2355,9 +1973,9 @@
 
         // 延迟启动动画，确保布局完成
         window.addEventListener('load', () => {
-            const sceneArea = document.getElementById('scene-area');
-            const w = sceneArea.clientWidth;
-            const h = sceneArea.clientHeight;
+            const r = document.getElementById('scene-area').getBoundingClientRect();
+            const w = r.width;
+            const h = r.height;
             if (w > 0 && h > 0) {
                 camera.aspect = w / h;
                 camera.updateProjectionMatrix();

@@ -1,0 +1,53 @@
+name: 同步千帆星座 TLE 数据
+
+on:
+  schedule:
+    # 每6小时同步一次（Space-Track 每天更新多次）
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 登录 Space-Track.org 并获取 QIANFAN TLE
+        env:
+          SPACETRACK_USER: ${{ secrets.SPACETRACK_USER }}
+          SPACETRACK_PASS: ${{ secrets.SPACETRACK_PASS }}
+        run: |
+          # 1. 登录获取 cookie
+          COOKIE=$(curl -s -c - "https://www.space-track.org/ajaxauth/login" \
+            -d "identity=${SPACETRACK_USER}&password=${SPACETRACK_PASS}" 2>/dev/null | \
+            grep JSESSIONID | awk '{print $NF}')
+
+          if [ -z "$COOKIE" ]; then
+            echo "❌ Space-Track 登录失败"
+            exit 1
+          fi
+          echo "✅ Space-Track 登录成功"
+
+          # 2. 查询 QIANFAN 卫星 TLE
+          curl -s -b "JSESSIONID=${COOKIE}" \
+            "https://www.space-track.org/basicspacedata/query/class/tle/OBJECT_NAME/QIANFAN~~/orderby/EPOCH%20desc/limit/300/format/tle" \
+            -o app/src/main/assets/qianfan_tle_backup.txt
+
+          # 3. 验证数据有效性
+          if head -1 app/src/main/assets/qianfan_tle_backup.txt | grep -q "^QIANFAN"; then
+            echo "✅ TLE 数据获取成功，共 $(wc -l < app/src/main/assets/qianfan_tle_backup.txt) 行"
+          else
+            echo "❌ TLE 数据格式异常"
+            exit 1
+          fi
+
+      - name: 提交更新
+        run: |
+          git config user.name "TLE Sync Bot"
+          git config user.email "bot@github.com"
+          git add app/src/main/assets/qianfan_tle_backup.txt
+          git diff --quiet || {
+            git commit -m "🛰️ 自动同步 QIANFAN 星座 TLE 数据 $(date +%Y-%m-%d)"
+            git push
+            echo "✅ 已提交并推送更新"
+          }
