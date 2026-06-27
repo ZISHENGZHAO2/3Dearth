@@ -61,7 +61,22 @@ class MainActivity : AppCompatActivity() {
             Log.i("TwinkStar", "JS 调用 getQianfanTLE(), 数据大小: ${qianfanTLE?.length ?: 0}")
             return qianfanTLE
         }
+
+        @JavascriptInterface
+        fun getLocalTLEBackup(): String? {
+            if (_localBackupCache != null) return _localBackupCache
+            _localBackupCache = try {
+                assets.open("qianfan_tle_backup.txt").bufferedReader().use { it.readText() }
+            } catch (e: Exception) {
+                Log.e("TwinkStar", "读取本地 TLE 备份失败: ${e.message}")
+                null
+            }
+            Log.i("TwinkStar", "JS 调用 getLocalTLEBackup(), 大小: ${_localBackupCache?.length ?: 0}")
+            return _localBackupCache
+        }
     }
+
+    private var _localBackupCache: String? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {

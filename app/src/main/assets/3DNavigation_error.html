@@ -18,7 +18,7 @@
 
         /* 左侧65% - 3D地球 */
         #canvas-container {
-            width: 65vw;
+            width: 80vw;
             height: 100vh;
             position: relative;
             overflow: hidden;
@@ -82,9 +82,9 @@
             display: block;
         }
 
-        /* 右侧35% */
+        /* 右侧20% */
         #right-container {
-            width: 35vw;
+            width: 20vw;
             display: flex;
             flex-direction: column;
             background: rgba(5,10,25,0.95);
@@ -125,43 +125,75 @@
             display: none;
         }
         .right-tab-content.active { display: block; }
+        #tab-satdb.active { display: flex; flex-direction: column; }
+        #tab-satdb.active #sat-dashboard-list { flex: 1; overflow-y: auto; }
 
-        /* 卫星信息卡片 */
+        /* ===== 卫星信息卡片（折叠列表） ===== */
         .sat-card {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,136,0,0.4);
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 8px;
-            position: relative;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,136,0,0.25);
+            border-radius: 5px;
+            margin-bottom: 3px;
+            overflow: hidden;
+            transition: border-color 0.15s;
         }
+        .sat-card:hover { border-color: rgba(255,136,0,0.45); }
+        .sat-card.expanded { border-color: rgba(255,136,0,0.5); }
         .sat-card .sat-card-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 6px;
+            gap: 4px;
+            padding: 4px 6px;
+            cursor: pointer;
+            user-select: none;
         }
+        .sat-card .sat-card-expand {
+            width: 16px; height: 16px;
+            background: transparent;
+            border: none;
+            color: #8899aa;
+            font-size: 10px;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform 0.15s;
+        }
+        .sat-card.expanded .sat-card-expand { transform: rotate(90deg); }
         .sat-card .sat-card-name {
+            flex: 1;
             color: #ffaa44;
-            font-size: 13px;
-            font-weight: bold;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .sat-card .sat-card-close {
-            background: rgba(255,60,60,0.3);
-            border: 1px solid rgba(255,60,60,0.5);
+            background: rgba(255,60,60,0.25);
+            border: 1px solid rgba(255,60,60,0.4);
             color: #ff6666;
-            width: 20px;
-            height: 20px;
+            width: 18px; height: 18px;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 0;
             line-height: 1;
+            flex-shrink: 0;
         }
         .sat-card .sat-card-close:hover { background: rgba(255,60,60,0.6); }
+        /* 可折叠详情区 */
+        .sat-card .sat-card-body {
+            display: none;
+            border-top: 1px solid rgba(255,136,0,0.15);
+            padding: 6px 8px 8px 8px;
+        }
+        .sat-card.expanded .sat-card-body { display: block; }
         .sat-card .sat-card-row {
             display: flex;
             justify-content: space-between;
@@ -178,6 +210,29 @@
             font-size: 12px;
             text-align: center;
             padding: 40px 20px;
+        }
+
+        /* 卫星仪表盘搜索栏 */
+        #sat-dashboard-search {
+            padding: 6px 0;
+            flex-shrink: 0;
+        }
+        #sat-dashboard-search input {
+            width: 100%;
+            padding: 5px 8px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(68,136,170,0.35);
+            border-radius: 4px;
+            color: #ccddee;
+            font-size: 11px;
+            outline: none;
+            box-sizing: border-box;
+        }
+        #sat-dashboard-search input:focus {
+            border-color: rgba(68,136,170,0.7);
+        }
+        #sat-dashboard-search input::placeholder {
+            color: #556677;
         }
 
         /* 参数行 */
@@ -298,6 +353,139 @@
             background: rgba(255,255,255,0.12);
         }
 
+        /* ===== 星座选择面板（左侧纵向） ===== */
+        #const-panel-wrapper {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 55%;
+            max-height: 55%;
+            z-index: 1001;
+            display: flex;
+            flex-direction: row;
+            pointer-events: none;
+            transition: left 0.3s ease;
+        }
+        #const-panel-wrapper.collapsed {
+            left: -220px;
+        }
+        #const-panel {
+            width: 210px;
+            height: 100%;
+            background: rgba(5,10,25,0.92);
+            border-right: 1px solid rgba(68,136,170,0.3);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 8px 6px;
+            pointer-events: auto;
+            flex-shrink: 0;
+        }
+        #const-panel::-webkit-scrollbar { width: 3px; }
+        #const-panel::-webkit-scrollbar-thumb { background: rgba(68,136,170,0.3); border-radius: 2px; }
+        .const-panel-toggle {
+            width: 24px;
+            height: 60px;
+            background: rgba(5,10,25,0.85);
+            border: 1px solid rgba(68,136,170,0.3);
+            border-left: none;
+            border-radius: 0 6px 6px 0;
+            color: #88bbdd;
+            font-size: 14px;
+            cursor: pointer;
+            pointer-events: auto;
+            flex-shrink: 0;
+            align-self: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            padding: 0;
+            margin: 0;
+            writing-mode: vertical-lr;
+            letter-spacing: 2px;
+        }
+        .const-panel-toggle:hover {
+            background: rgba(10,20,40,0.95);
+            border-color: rgba(68,136,170,0.6);
+            color: #ffffff;
+        }
+        .const-panel-toggle .arrow {
+            display: inline-block;
+            transition: transform 0.25s ease;
+            writing-mode: horizontal-tb;
+        }
+        #const-panel-wrapper.collapsed .const-panel-toggle .arrow {
+            transform: rotate(180deg);
+        }
+        .const-section-title {
+            color: #667788;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 6px 4px 4px 4px;
+            border-bottom: 1px solid rgba(68,136,170,0.15);
+            margin-bottom: 4px;
+        }
+        .const-check {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            background: transparent;
+            white-space: nowrap;
+            transition: all 0.12s;
+            font-size: 12px;
+            color: #8899aa;
+            user-select: none;
+            margin-bottom: 2px;
+        }
+        .const-check:hover { background: rgba(68,136,170,0.1); border-color: rgba(68,136,170,0.2); }
+        .const-check.checked {
+    color: #fff;
+    background: rgba(68,136,170,0.18);
+    border-color: rgba(68,136,170,0.35);
+    text-shadow: 0 0 6px rgba(255,255,255,0.12);
+    box-shadow: inset 3px 0 0 var(--cc, #88ccff);
+}
+        .const-check input[type="checkbox"] { display: none; }
+        .const-check .cc-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+            opacity: 0.5;
+            transition: opacity 0.15s;
+        }
+        .const-check.checked .cc-dot {
+    opacity: 1;
+    box-shadow: 0 0 6px var(--cc, #88ccff);
+}
+        .const-check .cc-label { font-weight: 500; flex: 1; }
+        .const-check .cc-count {
+            color: #556677;
+            font-size: 10px;
+            font-family: 'Consolas', monospace;
+        }
+        .const-check.checked .cc-count { color: #99bbdd; }
+        .const-check-all {
+            color: #88bbdd;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(68,136,170,0.12);
+            background: transparent;
+            display: block;
+            width: 100%;
+            text-align: left;
+            margin-bottom: 4px;
+            transition: all 0.12s;
+        }
+        .const-check-all:hover { border-color: rgba(68,136,170,0.4); background: rgba(68,136,170,0.08); }
+
     </style>
 </head>
 <body>
@@ -316,12 +504,13 @@
             </div>
             <!-- 3D 场景 -->
             <div id="scene-area">
+                <!-- 左侧星座选择面板 -->
+                <div id="const-panel-wrapper">
+                    <div id="const-panel"></div>
+                    <button class="const-panel-toggle" id="constToggle" title="收起/展开星座面板"><span class="arrow">◀</span> 星座</button>
+                </div>
                 <div id="controls">
                     <button id="btnGrid" class="toggle-btn active">关闭网格</button>
-                    <button id="btnQianfan" class="toggle-btn active">千帆星座</button>
-                    <button id="btnGW" class="toggle-btn active">GW星座</button>
-                    <button id="btnJilin" class="toggle-btn active">吉林一号</button>
-                    <button id="btnTianzhi" class="toggle-btn active">天智系列</button>
                     <button id="btnCloud" class="toggle-btn">开启云层</button>
                     <button id="btnOrbitScale" class="toggle-btn">LEO 正常视图</button>
                     <button id="btnCameraOrbit" class="toggle-btn">相机环绕</button>
@@ -336,6 +525,9 @@
             </div>
             <!-- 卫星仪表盘标签页 -->
             <div id="tab-satdb" class="right-tab-content active">
+                <div id="sat-dashboard-search">
+                    <input type="text" id="sat-search-input" placeholder="🔍 输入卫星名称搜索..." />
+                </div>
                 <div id="sat-dashboard-list">
                     <div id="sat-dashboard-empty">🛰️ 点击 3D 地球上的卫星光点<br>即可在此显示卫星数据</div>
                 </div>
@@ -1479,372 +1671,410 @@
             }
             // 重新绘制所有已选卫星的轨道线（各星座）
             if (selectedSats.size > 0) {
-                for (const [index, sel] of selectedSats) {
-                    const cfg = CONSTELLATIONS.find(c => c.id === sel.constId);
-                    const satrec = cfg ? cfg.satrecs[index] : null;
-                    if (!satrec) continue;
+                for (const [, sel] of selectedSats) {
                     if (sel.orbitLine) {
                         scene.remove(sel.orbitLine);
                         sel.orbitLine.geometry.dispose();
                         sel.orbitLine.material.dispose();
                     }
-                    sel.orbitLine = drawSatOrbit(satrec);
+                    sel.orbitLine = drawSatOrbit(sel.satrec);
                 }
             }
         });
 
-        // ====================== 多星座系统 ======================
-        // 定义所有星座
-        const CONSTELLATIONS = [
-            {
-                id: 'qianfan',  label: '千帆星座',  color: '#ff8800',
-                celestrakName: 'QIANFAN',
-                group: null, sprites: [], satrecs: [], visible: false,
-                dotTexture: null, btnId: 'btnQianfan', initColor: '#ff8800'
-            },
-            {
-                id: 'gw',  label: 'GW星座',  color: '#00ddff',
-                celestrakName: 'GW',
-                group: null, sprites: [], satrecs: [], visible: false,
-                dotTexture: null, btnId: 'btnGW', initColor: '#00ddff'
-            },
-            {
-                id: 'jilin',  label: '吉林一号',  color: '#44ff88',
-                celestrakName: 'JILIN',
-                group: null, sprites: [], satrecs: [], visible: false,
-                dotTexture: null, btnId: 'btnJilin', initColor: '#44ff88'
-            },
-            {
-                id: 'tianzhi',  label: '天智系列',  color: '#ff66aa',
-                celestrakName: 'TIANZHI',
-                group: null, sprites: [], satrecs: [], visible: false,
-                dotTexture: null, btnId: 'btnTianzhi', initColor: '#ff66aa'
-            }
+        // ====================== 多星座系统（Points 合并渲染） ======================
+        const CONST_COLORS = [
+            '#ff8800', '#00ddff', '#44ff88', '#ff66aa', '#88ccff',
+            '#ffdd44', '#ff4488', '#44ffdd', '#aa88ff', '#ff6644',
+            '#88ff44', '#dd44ff', '#44aaff', '#88ddff', '#44ffaa',
+            '#ff44cc', '#66ccff', '#ff9966', '#99ff66', '#cc66ff'
         ];
 
-        // 创建各星座圆点纹理（不同颜色）
-        function createConstellationDotTexture(color) {
-            const c = document.createElement('canvas');
-            c.width = 32; c.height = 32;
-            const ctx = c.getContext('2d');
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(16, 16, 10, 0, Math.PI * 2);
-            ctx.fill();
-            // 光晕效果
-            const grad = ctx.createRadialGradient(16, 16, 4, 16, 16, 16);
-            grad.addColorStop(0, color);
-            grad.addColorStop(0.5, color + '88');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(16, 16, 16, 0, Math.PI * 2);
-            ctx.fill();
-            const tex = new THREE.CanvasTexture(c);
-            tex.needsUpdate = true;
-            return tex;
-        }
+        // 保存所有已检测到的星座 cfg 对象
+        let CONSTELLATIONS = [];
+        // 所有卫星数据的原始 lines（已去注释）
+        let _allTLEData = null;
+        // 选中卫星 Map<index, { orbitLine, constId, sprite }>
+        const selectedSats = new Map();
 
-        // 从本地备份或远程获取 TLE
-        async function fetchTLE(name) {
-            // 1) 优先从本地备份文件读取（由 GitHub Actions 从 space-track.org 同步）
+        // ---------- 1. 获取所有 TLE 数据（只加载一次） ----------
+        async function loadAllTLE() {
+            // 优先 Android Bridge
+            if (window.AndroidBridge && AndroidBridge.getLocalTLEBackup) {
+                try {
+                    const raw = AndroidBridge.getLocalTLEBackup();
+                    if (raw && raw.trim().length > 50) return raw;
+                } catch(_) {}
+            }
+            // fetch 备用
             try {
                 const resp = await fetch('qianfan_tle_backup.txt');
                 if (resp.ok) {
                     const text = await resp.text();
-                    if (text && text.trim().length > 0) {
-                        // 只保留该星座的条目（3行一组，第1行包含星座名）
-                        const lines = text.trim().split('\n');
-                        const out = [];
-                        const upper = name.toUpperCase();
-                        for (let i = 0; i <= lines.length - 3; i += 3) {
-                            const nameLine = (lines[i] || '').toUpperCase();
-                            // 星链/千帆等直接包含星座名；AST/ISS 需要单词边界匹配
-                            if (nameLine.includes(upper) || new RegExp('\\b' + upper + '\\b').test(nameLine)) {
-                                out.push(lines[i], lines[i+1], lines[i+2]);
-                            }
-                        }
-                        if (out.length) {
-                            console.log(`[${name}] 从本地备份读取到 ${out.length/3} 颗卫星`);
-                            return out.join('\n');
-                        }
-                    }
+                    if (text && text.trim().length > 50) return text;
                 }
-            } catch (e) {
-                console.warn(`[${name}] 本地备份读取失败:`, e);
-            }
-
-            // 2) 通过 Android 桥接获取（由 MainActivity 预加载）
-            if (window.AndroidBridge && AndroidBridge['get' + name + 'TLE']) {
-                try {
-                    const raw = AndroidBridge['get' + name + 'TLE']();
-                    if (raw && raw.trim().length > 0) {
-                        console.log(`[${name}] 通过 Android 桥接获取 TLE 数据`);
-                        return raw;
-                    }
-                } catch (e) {
-                    console.warn(`[${name}] Android 桥接获取失败:`, e);
-                }
-            }
-
-            // 3) 最后 fallback 到 celestrak.org（国内可能无法访问）
-            try {
-                const resp = await fetch(`https://celestrak.org/NORAD/elements/gp.php?NAME=${name}&FORMAT=tle`);
-                if (resp.ok) {
-                    const text = await resp.text();
-                    if (text.startsWith(name)) return text;
-                }
-            } catch (e) {
-                console.warn(`[${name}] Celestrak 获取失败:`, e);
-            }
+            } catch(_) {}
             return null;
         }
 
-        // 解析 TLE 文本为 satrec 数组
-        function parseTLE(tleText) {
-            const lines = tleText.trim().split('\n').map(l => l.trimEnd());
-            const satrecs = [];
-            for (let i = 0; i < lines.length - 2; i += 3) {
-                const name = lines[i];
-                const line1 = lines[i + 1];
-                const line2 = lines[i + 2];
-                if (line1 && line1.startsWith('1 ') && line2 && line2.startsWith('2 ')) {
-                    try {
-                        const satrec = satellite.twoline2satrec(line1, line2);
-                        satrec.name = name;
-                        satrecs.push(satrec);
-                    } catch (e) { /* 跳过解析失败的 */ }
-                }
+        // ---------- 2. 从全部 TLE 中自动检测星座 ----------
+        function detectConstellations(rawText) {
+            const lines = rawText.trim().split('\n').filter(l => {
+                const t = l.trim();
+                return t.length > 0 && !t.startsWith('#');
+            });
+            _allTLEData = lines;
+
+            // 提取所有 name line，解析出星座前缀
+            const nameLines = [];
+            for (let i = 0; i <= lines.length - 3; i += 3) {
+                nameLines.push(lines[i].trim());
             }
-            return satrecs;
+
+            // 统计各星座卫星数
+            const constMap = new Map(); // prefix -> { count, names:[] }
+            for (const name of nameLines) {
+                const prefix = extractConstellation(name);
+                if (!constMap.has(prefix)) {
+                    constMap.set(prefix, { count: 0, names: [] });
+                }
+                constMap.get(prefix).count++;
+                if (constMap.get(prefix).names.length < 3) constMap.get(prefix).names.push(name);
+            }
+
+            // 转为 cfg 数组（按数量降序）
+            const sorted = [...constMap.entries()]
+                .sort((a, b) => b[1].count - a[1].count);
+
+            const result = [];
+            let colorIdx = 0;
+            for (const [prefix, info] of sorted) {
+                if (info.count < 1) continue;
+                const cfg = {
+                    id: prefix.toLowerCase(),
+                    label: prefix,
+                    color: CONST_COLORS[colorIdx % CONST_COLORS.length],
+                    count: info.count,
+                    satrecs: [],
+                    visible: true, // 默认全部显示
+                    _pointsObj: null,
+                    _positions: null,
+                    _hidden: null, // Uint8Array: 0=visible
+                    _startIdx: 0,  // 在全局索引中的起始位置
+                };
+                result.push(cfg);
+                colorIdx++;
+            }
+
+            // 设置友好的显示标签
+            const labelMap = {
+                'STARLINK': '星链',
+                'ONEWEB': 'OneWeb',
+                'QIANFAN': '千帆',
+                'IRIDIUM': '铱星',
+                'GLOBALSTAR': 'Globalstar',
+                'ORBCOMM': 'Orbcomm',
+                'KUIPER': 'Kuiper',
+                'LEMUR': 'Lemur',
+                'SWARM': 'Swarm',
+                'ISS': 'ISS',
+                'TIANMU': '天象',
+                'FENGYUN': '风云',
+                'YAOGAN': '遥感',
+                'GAOFEN': '高分',
+                'JILIN': '吉林',
+                'LUOJIA': '珞珈',
+            };
+            for (const cfg of result) {
+                if (labelMap[cfg.label]) cfg.label = labelMap[cfg.label];
+                else cfg.label = cfg.label.charAt(0) + cfg.label.slice(1).toLowerCase();
+            }
+
+            return result;
         }
 
-        // 为某个星座创建 Sprite 群组（基于其配置）
-        function createConstellationSprites(cfg) {
-            if (!cfg.dotTexture) cfg.dotTexture = createConstellationDotTexture(cfg.color);
-            const group = new THREE.Group();
-            const sprites = [];
-            const material = new THREE.SpriteMaterial({
-                map: cfg.dotTexture,
+        // 从卫星名称行提取星座前缀
+        function extractConstellation(nameLine) {
+            const u = nameLine.toUpperCase().trim();
+            // 去掉开头的 '0 ' 或数字前缀
+            const clean = u.replace(/^\d+\s*/, '');
+            // 特殊匹配列表（长名称优先）
+            const specials = ['GLOBALSTAR', 'STARLINK', 'ONEWEB', 'QIANFAN',
+                'IRIDIUM', 'ORBCOMM', 'KUIPER', 'LEMUR', 'SWARM',
+                'TIANMU', 'FENGYUN', 'YAOGAN', 'GAOFEN', 'JILIN', 'LUOJIA',
+                'HST', 'LANDSAT', 'SENTINEL', 'AISTECH', 'AST', 'NAVSTAR',
+                'BEIDOU', 'GALILEO', 'GLONASS', 'COSMOS', 'NOAA', 'METOP',
+                'TDRS', 'XW', 'TEC', 'SPACEBEE', 'FLOCK', 'DOVE',
+                'CENTAURI', 'ROBUSTA', 'SUCHAI', 'GOMX', 'SALSAT',
+                'NUSAT', 'LIGHTSAIL', 'NANOSATC', 'SERPENS', 'AAUSAT',
+                'RAINCUBE', 'ICEYE', 'CAPELLA', 'UMBRA', 'PLANET',
+                'SKYSAT', 'RAPIDEYE', 'EARLYBIRD', 'TEMPEST', 'CYGNSS',
+                'GRACE', 'SWARM', 'SMAP', 'AQUA', 'TERRA', 'AURA',
+                'CALIPSO', 'CLOUDSAT', 'OSTM', 'JASON', 'TOPEX',
+                'ENVISAT', 'ERS', 'CRYOSAT', 'GOCE', 'AEOLUS',
+                'BIOMASS', 'EARTHCARE', 'FIREBIRD', 'ELANA', 'NORSAT',
+                'SEALION', 'PATHFINDER', 'TARANIS', 'ANGELS',
+                'OUFTI', 'ESEO', 'E-STAR', 'FUNSAIL', 'SKYCUBE',
+                'LUNAR', 'MARS', 'TIANZHOU', 'SHENZHOU', 'CHANG\'E',
+                'TIANWEN', 'ZHENGHE', 'MACAU', 'HISUI', 'ASNARO',
+                'ALOS', 'DAICHI', 'IGS', 'KOMPSAT', 'ARIRANG',
+                'DMC', 'UKDMC', 'BILSAT', 'RASAT', 'GOKTURK',
+                'EGYPTSAT', 'ALSAT', 'NIGERIASAT', 'RAPEYE', 'TACSAT'];
+
+            for (const s of specials) {
+                if (clean.startsWith(s)) return s;
+            }
+
+            // 通用规则：取第一个 '-' 或 '(' 或空格之前的词
+            const m = clean.match(/^([A-Z][A-Z0-9]+)/);
+            if (m) return m[1];
+
+            // 最后 fallback：取前两个字符
+            return clean.substring(0, Math.min(6, clean.length)) || 'OTHER';
+        }
+
+        // ---------- 3. 为星座分配卫星（解析 TLE） ----------
+        function assignSatellites(cfgs) {
+            const lines = _allTLEData;
+            let globalIdx = 0;
+
+            // 记录每个星座首次出现的 globalIdx
+            const firstIdx = {};
+            for (const cfg of cfgs) firstIdx[cfg.id] = -1;
+
+            for (let i = 0; i <= lines.length - 3; i += 3) {
+                const nameLine = lines[i].trim();
+                const line1 = lines[i+1].trim();
+                const line2 = lines[i+2].trim();
+                if (!line1.startsWith('1 ') || !line2.startsWith('2 ')) { globalIdx++; continue; }
+
+                const prefix = extractConstellation(nameLine);
+                const cfg = cfgs.find(c => c.label.toUpperCase() === prefix || c.id === prefix.toLowerCase());
+                try {
+                    const satrec = satellite.twoline2satrec(line1, line2);
+                    satrec.name = nameLine;
+                    if (cfg) {
+                        if (firstIdx[cfg.id] === -1) firstIdx[cfg.id] = globalIdx;
+                        cfg.satrecs.push(satrec);
+                    }
+                } catch(_) {}
+                globalIdx++;
+            }
+
+            // 设置每个星座的正确起始索引
+            for (const cfg of cfgs) cfg._startIdx = firstIdx[cfg.id] || 0;
+
+            // 去掉没有卫星的星座
+            return cfgs.filter(c => c.satrecs.length > 0);
+        }
+
+        // 生成圆形纹理（实心圆，无边缘柔化）
+        function createCircleTexture() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const center = size / 2;
+            const radius = size / 2 - 1;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, Math.PI * 2);
+            ctx.fill();
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            return texture;
+        }
+        const _circleTex = createCircleTexture();
+
+        // ---------- 4. 为每个星座创建 Points ----------
+        function createConstellationPoints(cfg) {
+            const count = cfg.satrecs.length;
+            const positions = new Float32Array(count * 3);
+            // 初始全隐藏（等待第一次位置更新）
+            positions.fill(99999);
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: new THREE.Color(cfg.color),
+                size: 0.023,
+                map: _circleTex,
                 transparent: true,
+                opacity: 1.0,
                 depthWrite: false,
-                blending: THREE.AdditiveBlending
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: true
             });
-            for (let i = 0; i < cfg.satrecs.length; i++) {
-                const sprite = new THREE.Sprite(material.clone());
-                sprite.scale.set(0.03, 0.03, 1);
-                sprite.userData.satIndex = i;
-                sprite.userData.constId = cfg.id;
-                sprite.userData.selected = false;
-                sprite.position.set(9999, 9999, 9999);
-                group.add(sprite);
-                sprites.push(sprite);
-            }
-            group.rotation.y = earth.rotation.y;
-            return { group, sprites };
+
+            const pointsObj = new THREE.Points(geometry, material);
+            pointsObj.userData.constId = cfg.id;
+            scene.add(pointsObj);
+
+            cfg._pointsObj = pointsObj;
+            cfg._positions = positions;
+            cfg._hidden = new Uint8Array(count); // 全 0 = 全显示
+            cfg._highlighted = new Uint8Array(count); // 额外高亮标记
         }
 
-        // 更新某星座所有卫星位置（每帧调用）
-        function updateConstellationPositions(cfg, now) {
-            if (!cfg.visible || !cfg.sprites.length || !cfg.satrecs.length) return;
+        // ---------- 5. 更新所有卫星位置（每帧） ----------
+        function updateAllSatPositions(now) {
             const gmst = satellite.gstime(now);
-            for (let i = 0; i < cfg.satrecs.length; i++) {
-                const satrec = cfg.satrecs[i];
-                const sprite = cfg.sprites[i];
-                const posVel = satellite.propagate(satrec, now);
-                if (posVel.position) {
-                    const gd = satellite.eciToGeodetic(posVel.position, gmst);
-                    const r = (1.0 + gd.height / 6371.0) * orbitScaleFactor;
-                    const phi = Math.PI / 2 - gd.latitude;
-                    const theta = gd.longitude + Math.PI;
-                    sprite.position.set(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
-                    if (!sprite.userData.selected) sprite.scale.set(0.03, 0.03, 1);
-                } else {
-                    sprite.position.set(9999, 9999, 9999);
-                }
-            }
-        }
-
-        // 初始化单个星座
-        async function initConstellation(cfg) {
-            const tleText = await fetchTLE(cfg.celestrakName);
-            if (!tleText) {
-                console.warn(`[${cfg.id}] 无法获取 TLE 数据`);
-                return;
-            }
-            cfg.satrecs = parseTLE(tleText);
-            console.log(`[${cfg.id}] 解析到 ${cfg.satrecs.length} 颗卫星`);
-            if (cfg.satrecs.length === 0) return;
-            const { group, sprites } = createConstellationSprites(cfg);
-            cfg.group = group;
-            cfg.sprites = sprites;
-            scene.add(cfg.group);
-            cfg.visible = true;
-            updateConstellationPositions(cfg, new Date());
-        }
-
-        // 翻转星座显示状态（按钮回调）
-        function toggleConstellation(cfg) {
-            cfg.visible = !cfg.visible;
-            const btn = document.getElementById(cfg.btnId);
-            btn.textContent = cfg.visible ? cfg.label : cfg.label.replace('', '');
-            btn.classList.toggle('active', cfg.visible);
-            if (cfg.group) cfg.group.visible = cfg.visible;
-        }
-
-        // 批量初始化所有星座
-        async function initAllConstellations() {
-            await Promise.all(CONSTELLATIONS.map(cfg => initConstellation(cfg)));
-            // 设置按钮事件
-            CONSTELLATIONS.forEach(cfg => {
-                document.getElementById(cfg.btnId).addEventListener('click', () => toggleConstellation(cfg));
-            });
-            // 默认千帆选中——保持千帆卫星的 selectedSats 逻辑兼容
-            // 把所有千帆 satrec 放入 qianfanSatrecs 引用（兼容旧代码）
-            const qf = CONSTELLATIONS.find(c => c.id === 'qianfan');
-            if (qf) {
-                qianfanSatrecs = qf.satrecs;
-                qianfanSprites = qf.sprites;
-                qianfanGroup = qf.group;
-                qianfanVisible = qf.visible;
-            }
-        }
-        // 千帆兼容引用（供 selectSat / deselectSat / sat 仪表盘使用）
-        let qianfanGroup = null, qianfanSprites = [], qianfanSatrecs = [], qianfanVisible = false, qianfanDotTexture = null;
-
-        // ====================== 右侧标签页切换 ======================
-        document.querySelectorAll('.right-tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.right-tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.right-tab-content').forEach(p => p.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById('tab-' + btn.dataset.rtab).classList.add('active');
-            });
-        });
-
-        function switchToSatTab() {
-            document.querySelectorAll('.right-tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.right-tab-content').forEach(p => p.classList.remove('active'));
-            document.querySelector('[data-rtab="satdb"]').classList.add('active');
-            document.getElementById('tab-satdb').classList.add('active');
-        }
-
-        // ====================== 北京时间时钟 ======================
-        function updateBeijingClock() {
-            const now = new Date();
-            const h = now.getHours().toString().padStart(2, '0');
-            const m = now.getMinutes().toString().padStart(2, '0');
-            const s = now.getSeconds().toString().padStart(2, '0');
-            const el = document.getElementById('beijingClock');
-            if (el) el.textContent = `北京时间 ${h}:${m}:${s}`;
-        }
-        setInterval(updateBeijingClock, 1000);
-        updateBeijingClock();
-
-        // ====================== 卫星仪表盘卡片管理 ======================
-        function createSatCard(satrec, index) {
-            const now = new Date();
-            const pv = satellite.propagate(satrec, now);
-            if (!pv.position) return null;
-            const gmst = satellite.gstime(now);
-            const gd = satellite.eciToGeodetic(pv.position, gmst);
-            const alt = gd.height;
-            const latDeg = gd.latitude * 180 / Math.PI;
-            const lonDeg = gd.longitude * 180 / Math.PI;
-            const velKm = pv.velocity ? Math.sqrt(pv.velocity.x**2 + pv.velocity.y**2 + pv.velocity.z**2) : 0;
-            const name = (satrec.name || 'UNKNOWN').trim();
-            const noradId = satrec.satnum;
-            const meanMotion = satrec.no_kozai || satrec.no;
-            const periodMin = (2 * Math.PI) / meanMotion;
-
-            const card = document.createElement('div');
-            card.className = 'sat-card';
-            card.id = 'sat-card-' + index;
-            card.innerHTML = `
-                <div class="sat-card-header">
-                    <span class="sat-card-name">🛰️ ${name}</span>
-                    <button class="sat-card-close" data-index="${index}" title="取消显示">×</button>
-                </div>
-                <div class="sat-card-row"><span class="sat-card-label">NORAD ID</span><span class="sat-card-value">${noradId}</span></div>
-                <div class="sat-card-row"><span class="sat-card-label">轨道高度</span><span class="sat-card-value">${alt.toFixed(1)} km</span></div>
-                <div class="sat-card-row"><span class="sat-card-label">运行速度</span><span class="sat-card-value">${velKm.toFixed(2)} km/s</span></div>
-                <div class="sat-card-row"><span class="sat-card-label">轨道周期</span><span class="sat-card-value">${periodMin.toFixed(1)} min</span></div>
-                <div class="sat-card-row"><span class="sat-card-label">纬度</span><span class="sat-card-value">${latDeg >= 0 ? latDeg.toFixed(2)+'°N' : Math.abs(latDeg).toFixed(2)+'°S'}</span></div>
-                <div class="sat-card-row"><span class="sat-card-label">经度</span><span class="sat-card-value">${lonDeg >= 0 ? lonDeg.toFixed(2)+'°E' : Math.abs(lonDeg).toFixed(2)+'°W'}</span></div>
-            `;
-            // 关闭按钮事件
-            card.querySelector('.sat-card-close').addEventListener('click', (e) => {
-                e.stopPropagation();
-                const idx = parseInt(e.target.dataset.index);
-                deselectSat(idx);
-                updateSatDashboard();
-            });
-            return card;
-        }
-
-        function updateSatDashboard() {
-            const container = document.getElementById('sat-dashboard-list');
-            const emptyMsg = document.getElementById('sat-dashboard-empty');
-            if (selectedSats.size === 0) {
-                if (emptyMsg) emptyMsg.style.display = 'block';
-                container.querySelectorAll('.sat-card').forEach(c => c.remove());
-                return;
-            }
-            if (emptyMsg) emptyMsg.style.display = 'none';
-            // 移除已取消的卡片
-            container.querySelectorAll('.sat-card').forEach(c => {
-                const idx = parseInt(c.id.replace('sat-card-', ''));
-                if (!selectedSats.has(idx)) c.remove();
-            });
-            // 添加新卡片
-            for (const [index, sel] of selectedSats) {
-                if (!document.getElementById('sat-card-' + index)) {
-                    const cfg = CONSTELLATIONS.find(c => c.id === sel.constId);
-                    const satrec = cfg ? cfg.satrecs[index] : null;
-                    if (satrec) {
-                        const card = createSatCard(satrec, index);
-                        if (card) container.appendChild(card);
+            for (const cfg of CONSTELLATIONS) {
+                if (!cfg.visible || !cfg._positions) continue;
+                const positions = cfg._positions;
+                const satrecs = cfg.satrecs;
+                const hidden = cfg._hidden;
+                for (let i = 0; i < satrecs.length; i++) {
+                    if (hidden[i]) {
+                        positions[i*3] = 99999;
+                        positions[i*3+1] = 99999;
+                        positions[i*3+2] = 99999;
+                        continue;
+                    }
+                    const pv = satellite.propagate(satrecs[i], now);
+                    if (pv.position) {
+                        const gd = satellite.eciToGeodetic(pv.position, gmst);
+                        const r = (1.0 + gd.height / 6371.0) * orbitScaleFactor;
+                        const phi = Math.PI / 2 - gd.latitude;
+                        const theta = gd.longitude + Math.PI;
+                        positions[i*3] = -r * Math.sin(phi) * Math.cos(theta);
+                        positions[i*3+1] = r * Math.cos(phi);
+                        positions[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+                    } else {
+                        positions[i*3] = 99999;
+                        positions[i*3+1] = 99999;
+                        positions[i*3+2] = 99999;
                     }
                 }
+                cfg._pointsObj.geometry.attributes.position.needsUpdate = true;
             }
         }
 
-        // ====================== 卫星点击选中/轨道显示 ======================
-        const selectedSats = new Map(); // Map<index, {orbitLine, constId}>
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
+        // ---------- 6. 构建星座选择面板 UI ----------
+        function buildConstPanel(cfgs) {
+            const panel = document.getElementById('const-panel');
+            panel.innerHTML = '';
 
-        function deselectSat(index) {
-            const sel = selectedSats.get(index);
+            // 全选/取消按钮
+            const allBtn = document.createElement('button');
+            allBtn.className = 'const-check-all';
+            allBtn.textContent = '☑ 全部';
+            allBtn.addEventListener('click', () => {
+                const anyOff = cfgs.some(c => !c.visible);
+                for (const cfg of cfgs) {
+                    cfg.visible = anyOff;
+                    if (cfg._pointsObj) cfg._pointsObj.visible = anyOff;
+                }
+                buildConstPanel(cfgs);
+            });
+            panel.appendChild(allBtn);
+
+            // 每个星座一个 checkbox
+            for (const cfg of cfgs) {
+                const el = document.createElement('label');
+                el.className = 'const-check' + (cfg.visible ? ' checked' : '');
+                el.style.setProperty('--cc', cfg.color);
+
+                const dot = document.createElement('span');
+                dot.className = 'cc-dot';
+                dot.style.background = cfg.color;
+                el.appendChild(dot);
+
+                const lbl = document.createElement('span');
+                lbl.className = 'cc-label';
+                lbl.textContent = cfg.label;
+                el.appendChild(lbl);
+
+                const cnt = document.createElement('span');
+                cnt.className = 'cc-count';
+                cnt.textContent = `${cfg.count}`;
+                el.appendChild(cnt);
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = cfg.visible;
+                el.appendChild(cb);
+
+                // 仅通过 checkbox change 事件控制显示状态（浏览器的 label 默认行为会自动转发点击到 checkbox）
+                cb.addEventListener('change', () => {
+                    cfg.visible = cb.checked;
+                    if (cfg._pointsObj) cfg._pointsObj.visible = cfg.visible;
+                    el.classList.toggle('checked', cfg.visible);
+                });
+
+                panel.appendChild(el);
+            }
+
+            // 注册收起/展开按钮（只注册一次）
+            const toggleBtn = document.getElementById('constToggle');
+            if (toggleBtn && !toggleBtn._registered) {
+                toggleBtn._registered = true;
+                toggleBtn.addEventListener('click', () => {
+                    const wrapper = document.getElementById('const-panel-wrapper');
+                    wrapper.classList.toggle('collapsed');
+                    const arrow = toggleBtn.querySelector('.arrow');
+                    if (arrow) arrow.textContent = wrapper.classList.contains('collapsed') ? '▶' : '◀';
+                });
+            }
+        }
+
+        // ---------- 7. 主初始化流程 ----------
+        async function initSatelliteSystem() {
+            const raw = await loadAllTLE();
+            if (!raw) {
+                console.error('[Sat] 无法加载 TLE 备份数据');
+                return;
+            }
+            const detected = detectConstellations(raw);
+            console.log(`[Sat] 检测到 ${detected.length} 个星座，总计 ${_allTLEData.length/3} 颗卫星`);
+            for (const d of detected) {
+                console.log(`  ${d.label}: ${d.count}`);
+            }
+
+            CONSTELLATIONS = assignSatellites(detected);
+            console.log(`[Sat] 分配后 ${CONSTELLATIONS.length} 个星座有卫星数据`);
+
+            for (const cfg of CONSTELLATIONS) {
+                createConstellationPoints(cfg);
+            }
+
+            buildConstPanel(CONSTELLATIONS);
+
+            // 首次位置更新
+            updateAllSatPositions(new Date());
+
+            // 构建全卫星仪表盘列表
+            buildAllSatelliteList();
+        }
+
+        // ---------- 8. 选中/取消选中卫星 ----------
+        function deselectSat(globalIdx) {
+            const sel = selectedSats.get(globalIdx);
             if (!sel) return;
             if (sel.orbitLine) {
                 scene.remove(sel.orbitLine);
                 sel.orbitLine.geometry.dispose();
                 sel.orbitLine.material.dispose();
             }
-            // 在所有星座中取消选中标记
-            for (const cfg of CONSTELLATIONS) {
-                const sprite = cfg.sprites[index];
-                if (sprite) {
-                    sprite.userData.selected = false;
-                    sprite.scale.set(0.03, 0.03, 1);
-                    break;
-                }
+            if (sel.sprite) {
+                scene.remove(sel.sprite);
+                sel.sprite.material.dispose();
+                sel.sprite = null;
             }
-            selectedSats.delete(index);
+            selectedSats.delete(globalIdx);
         }
 
         function clearAllSatSelections() {
-            for (const index of [...selectedSats.keys()]) {
-                deselectSat(index);
-            }
+            for (const idx of [...selectedSats.keys()]) deselectSat(idx);
         }
 
         // 绘制选中卫星的轨道线
         function drawSatOrbit(satrec) {
             const now = new Date();
             const meanMotion = satrec.no_kozai || satrec.no;
-            const periodMin = (2 * Math.PI) / meanMotion;
+            const periodMin = meanMotion ? (2 * Math.PI) / meanMotion : 90;
             const periodMs = periodMin * 60 * 1000;
             const steps = 128;
             const points = [];
@@ -1872,54 +2102,332 @@
             return line;
         }
 
-        // 处理卫星点击（Sprite 射线检测，精确匹配屏幕位置）
-        function onSatelliteClick(event) {
-            if (event.target !== renderer.domElement) return; // 只响应 canvas 点击
+        // 高亮精灵（选中卫星的标记）
+        function createHighlightSprite(color) {
+            const c = document.createElement('canvas');
+            c.width = 64; c.height = 64;
+            const ctx = c.getContext('2d');
+            const grad = ctx.createRadialGradient(32, 32, 4, 32, 32, 32);
+            grad.addColorStop(0, color);
+            grad.addColorStop(0.3, color + 'cc');
+            grad.addColorStop(0.7, color + '44');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 64, 64);
+            const tex = new THREE.CanvasTexture(c);
+            const mat = new THREE.SpriteMaterial({
+                map: tex, transparent: true, depthTest: false,
+                blending: THREE.AdditiveBlending
+            });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(0.12, 0.12, 1);
+            scene.add(sprite);
+            return sprite;
+        }
 
-            // 收集所有可见星座的 sprite
-            const allSprites = [];
-            CONSTELLATIONS.forEach(cfg => { if (cfg.visible && cfg.sprites.length) allSprites.push(...cfg.sprites); });
-            if (allSprites.length === 0) return;
+        // ---------- 9. 卫星点击处理（Raycaster on Points） ----------
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        function onSatelliteClick(event) {
+            if (event.target !== renderer.domElement) return;
+
+            const allPoints = CONSTELLATIONS
+                .filter(c => c.visible && c._pointsObj)
+                .map(c => c._pointsObj);
+            if (allPoints.length === 0) return;
 
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(allSprites, false);
+            // 调高阈值提升点击精度
+            raycaster.params.Points = { threshold: 0.04 };
+            const intersects = raycaster.intersectObjects(allPoints, false);
             if (intersects.length === 0) return;
 
-            const hitSprite = intersects[0].object;
-            const idx = hitSprite.userData.satIndex;
-            const constId = hitSprite.userData.constId;
+            const hit = intersects[0];
+            const pointIdx = hit.index;
+            const constId = hit.object.userData.constId;
             const cfg = CONSTELLATIONS.find(c => c.id === constId);
-            if (!cfg || idx === undefined || idx < 0 || idx >= cfg.satrecs.length) return;
+            if (!cfg || pointIdx === undefined || pointIdx >= cfg.satrecs.length) return;
 
-            // 跳过传播失败的卫星（位置在远处）
-            if (Math.abs(hitSprite.position.x) > 100) return;
+            const satrec = cfg.satrecs[pointIdx];
+            if (!satrec) return;
 
-            if (selectedSats.has(idx)) {
-                // 再次点击 → 取消选中
-                deselectSat(idx);
+            // 计算全局索引
+            const globalIdx = cfg._startIdx + pointIdx;
+
+            if (selectedSats.has(globalIdx)) {
+                deselectSat(globalIdx);
             } else {
-                // 选中新卫星
-                const satrec = cfg.satrecs[idx];
-                if (!satrec) return;
-                hitSprite.userData.selected = true;
+                // 先清除其他选中
+                // clearAllSatSelections(); // 可选：是否允许多选
                 const orbitLine = drawSatOrbit(satrec);
-                selectedSats.set(idx, { orbitLine, constId });
+                const hlSprite = createHighlightSprite(cfg.color);
+                // 立即放到卫星位置
+                const now = new Date();
+                const gmst = satellite.gstime(now);
+                const pv = satellite.propagate(satrec, now);
+                if (pv.position) {
+                    const gd = satellite.eciToGeodetic(pv.position, gmst);
+                    const r = (1.0 + gd.height / 6371.0) * orbitScaleFactor;
+                    const phi = Math.PI / 2 - gd.latitude;
+                    const theta = gd.longitude + Math.PI;
+                    hlSprite.position.set(
+                        -r * Math.sin(phi) * Math.cos(theta),
+                        r * Math.cos(phi),
+                        r * Math.sin(phi) * Math.sin(theta)
+                    );
+                }
+                selectedSats.set(globalIdx, { orbitLine, constId: cfg.id, sprite: hlSprite, satrec, cfg });
             }
-            // 自动切换到卫星仪表盘并更新卡片
+
             switchToSatTab();
             updateSatDashboard();
         }
 
-        sceneArea.addEventListener('pointerup', (event) => {
-            onSatelliteClick(event);
+        sceneArea.addEventListener('pointerup', onSatelliteClick);
+
+        // ---------- 10. 仪表盘——全卫星列表（折叠型） ----------
+        /** 通过全局索引找到星座配置和卫星数据 */
+        function findSatelliteByGlobalIdx(globalIdx) {
+            for (const c of CONSTELLATIONS) {
+                if (globalIdx >= c._startIdx && globalIdx < c._startIdx + c.satrecs.length) {
+                    return { cfg: c, satrec: c.satrecs[globalIdx - c._startIdx] };
+                }
+            }
+            return null;
+        }
+
+        /** 创建一颗卫星的卡片（仅头部 + 空详情体，展开时懒填充） */
+        function createSatCard(globalIdx) {
+            const info = findSatelliteByGlobalIdx(globalIdx);
+            if (!info) return null;
+            const { cfg, satrec } = info;
+            const name = (satrec.name || 'UNKNOWN').trim();
+
+            const card = document.createElement('div');
+            card.className = 'sat-card';
+            card.id = 'sat-card-' + globalIdx;
+            card.dataset.idx = globalIdx;
+            card._bodyPopulated = false;
+
+            // --- 头部 ---
+            const header = document.createElement('div');
+            header.className = 'sat-card-header';
+            header.innerHTML = `
+                <button class="sat-card-expand" title="展开详情">▶</button>
+                <span class="sat-card-name">🛰️ ${name}</span>
+            `;
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'sat-card-close';
+            closeBtn.title = '取消选中';
+            closeBtn.textContent = '×';
+            closeBtn.style.display = 'none';
+            header.appendChild(closeBtn);
+            card.appendChild(header);
+
+            // --- 详情体（空，展开时懒填充） ---
+            card.appendChild(document.createElement('div'));
+            card.querySelector(':scope > div:last-child').className = 'sat-card-body';
+
+            // --- 展开/折叠 ---
+            header.addEventListener('click', (e) => {
+                if (e.target.closest('.sat-card-close')) return;
+                const wasExpanded = card.classList.contains('expanded');
+                if (!wasExpanded) {
+                    if (!card._bodyPopulated) {
+                        populateSatCardBody(card, globalIdx, cfg, satrec);
+                        card._bodyPopulated = true;
+                    }
+                    card.classList.add('expanded');
+                } else {
+                    card.classList.remove('expanded');
+                }
+            });
+
+            // --- × 关闭按钮（取消选中） ---
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedSats.has(globalIdx)) deselectSat(globalIdx);
+                card.classList.remove('expanded');
+                closeBtn.style.display = 'none';
+            });
+
+            return card;
+        }
+
+        /** 懒填充卫星详细数据 */
+        function populateSatCardBody(card, globalIdx, cfg, satrec) {
+            const now = new Date();
+            const pv = satellite.propagate(satrec, now);
+            if (!pv.position) {
+                card.querySelector('.sat-card-body').innerHTML = '<div style="color:#667;font-size:11px;padding:4px;">暂无数据</div>';
+                return;
+            }
+            const gmst = satellite.gstime(now);
+            const gd = satellite.eciToGeodetic(pv.position, gmst);
+            const alt = gd.height;
+            const latDeg = gd.latitude * 180 / Math.PI;
+            const lonDeg = gd.longitude * 180 / Math.PI;
+            const velKm = pv.velocity ? Math.sqrt(pv.velocity.x**2 + pv.velocity.y**2 + pv.velocity.z**2) : 0;
+            const noradId = satrec.satnum;
+            const meanMotion = satrec.no_kozai || satrec.no;
+            const periodMin = meanMotion ? (2 * Math.PI) / meanMotion : 0;
+            const inclDeg = satrec.inclo ? satrec.inclo * 180 / Math.PI : 0;
+
+            const body = card.querySelector('.sat-card-body');
+            body.innerHTML = `
+                <div class="sat-card-row">
+                    <span class="sat-card-label">星座</span>
+                    <span class="sat-card-value" style="color:${cfg.color}">${cfg.label}</span>
+                </div>
+                <div class="sat-card-row"><span class="sat-card-label">NORAD ID</span><span class="sat-card-value">${noradId}</span></div>
+                <div class="sat-card-row"><span class="sat-card-label">轨道高度</span><span class="sat-card-value">${alt.toFixed(1)} km</span></div>
+                <div class="sat-card-row"><span class="sat-card-label">运行速度</span><span class="sat-card-value">${velKm.toFixed(2)} km/s</span></div>
+                <div class="sat-card-row"><span class="sat-card-label">轨道周期</span><span class="sat-card-value">${periodMin.toFixed(1)} min</span></div>
+                <div class="sat-card-row"><span class="sat-card-label">轨道倾角</span><span class="sat-card-value">${inclDeg.toFixed(1)}°</span></div>
+                <div class="sat-card-row"><span class="sat-card-label">纬度</span><span class="sat-card-value">${latDeg >= 0 ? latDeg.toFixed(2)+'°N' : Math.abs(latDeg).toFixed(2)+'°S'}</span></div>
+                <div class="sat-card-row"><span class="sat-card-label">经度</span><span class="sat-card-value">${lonDeg >= 0 ? lonDeg.toFixed(2)+'°E' : Math.abs(lonDeg).toFixed(2)+'°W'}</span></div>
+                <div style="display:flex;gap:4px;margin-top:6px">
+                    <button class="sat-card-action" data-action="show-only" data-idx="${globalIdx}" style="flex:1;font-size:10px;background:rgba(68,136,170,0.2);border:1px solid rgba(68,136,170,0.3);color:#88bbdd;padding:3px 6px;border-radius:3px;cursor:pointer">只显示这颗</button>
+                    <button class="sat-card-action" data-action="hide" data-idx="${globalIdx}" style="flex:1;font-size:10px;background:rgba(255,68,68,0.15);border:1px solid rgba(255,68,68,0.3);color:#ff6666;padding:3px 6px;border-radius:3px;cursor:pointer">隐藏这颗</button>
+                </div>
+            `;
+            body.querySelectorAll('.sat-card-action').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(e.target.dataset.idx);
+                    const action = e.target.dataset.action;
+                    const sel2 = selectedSats.get(idx);
+                    if (!sel2) return;
+                    const c = sel2.cfg;
+                    const localIdx = idx - c._startIdx;
+                    if (action === 'hide') {
+                        c._hidden[localIdx] = 1;
+                        deselectSat(idx);
+                        updateSatDashboard();
+                    } else if (action === 'show-only') {
+                        c._hidden.fill(1);
+                        c._hidden[localIdx] = 0;
+                        deselectSat(idx);
+                        updateSatDashboard();
+                    }
+                });
+            });
+        }
+
+        /** 构建全卫星列表（扁平列表，所有卡片一次创建） */
+        function buildAllSatelliteList() {
+            const container = document.getElementById('sat-dashboard-list');
+            const emptyMsg = document.getElementById('sat-dashboard-empty');
+            if (emptyMsg) emptyMsg.style.display = 'none';
+            container.innerHTML = '';
+
+            // 初始化卡片引用
+            for (const cfg of CONSTELLATIONS) cfg._cards = [];
+
+            const frag = document.createDocumentFragment();
+            for (const cfg of CONSTELLATIONS) {
+                for (let i = 0; i < cfg.satrecs.length; i++) {
+                    const card = createSatCard(cfg._startIdx + i);
+                    if (card) {
+                        cfg._cards.push(card);
+                        frag.appendChild(card);
+                    }
+                }
+            }
+            container.appendChild(frag);
+
+            // 注册搜索过滤
+            setupSatSearch();
+        }
+
+        /** 卫星搜索过滤 */
+        let _searchRegistered = false;
+        function setupSatSearch() {
+            if (_searchRegistered) return;
+            _searchRegistered = true;
+            const input = document.getElementById('sat-search-input');
+            if (!input) return;
+            input.addEventListener('input', () => {
+                const q = input.value.trim().toLowerCase();
+                const container = document.getElementById('sat-dashboard-list');
+                const cards = container.querySelectorAll('.sat-card');
+                let visible = 0;
+                for (const card of cards) {
+                    const nameEl = card.querySelector('.sat-card-name');
+                    const name = nameEl ? nameEl.textContent.toLowerCase() : '';
+                    const match = !q || name.includes(q);
+                    card.style.display = match ? '' : 'none';
+                    if (match) visible++;
+                }
+                const empty = document.getElementById('sat-dashboard-empty');
+                if (empty) empty.style.display = visible > 0 ? 'none' : 'block';
+            });
+        }
+
+        /** 选中/取消选中时：展开/折叠 + 置顶 */
+        function updateSatDashboard() {
+            if (selectedSats.size === 0) return;
+
+            const container = document.getElementById('sat-dashboard-list');
+
+            // 1. 展开已选中卫星 + 填充详情 + 置顶
+            for (const [idx] of selectedSats) {
+                const card = document.getElementById('sat-card-' + idx);
+                if (!card) continue;
+
+                if (!card._bodyPopulated) {
+                    const info = findSatelliteByGlobalIdx(idx);
+                    if (info) {
+                        populateSatCardBody(card, idx, info.cfg, info.satrec);
+                        card._bodyPopulated = true;
+                    }
+                }
+                card.classList.add('expanded');
+                const cb = card.querySelector('.sat-card-close');
+                if (cb) cb.style.display = '';
+
+                // 置顶
+                if (card.parentNode === container) {
+                    container.insertBefore(card, container.firstChild);
+                }
+            }
+
+            // 2. 非选中卫星折叠 + 隐藏 × 按钮
+            document.querySelectorAll('.sat-card').forEach(c => {
+                const idx = parseInt(c.dataset.idx);
+                if (!isNaN(idx) && !selectedSats.has(idx)) {
+                    c.classList.remove('expanded');
+                    const cb = c.querySelector('.sat-card-close');
+                    if (cb) cb.style.display = 'none';
+                }
+            });
+
+            // 3. 滚动到顶部
+            container.scrollTop = 0;
+        }
+
+        // ---------- 11. 右侧标签页 ----------
+        document.querySelectorAll('.right-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.right-tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.right-tab-content').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.rtab).classList.add('active');
+            });
         });
 
-        // 启动时自动加载千帆星座
-        initAllConstellations();
+        function switchToSatTab() {
+            document.querySelectorAll('.right-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.right-tab-content').forEach(p => p.classList.remove('active'));
+            const tab = document.querySelector('[data-rtab="satdb"]');
+            if (tab) tab.classList.add('active');
+            const content = document.getElementById('tab-satdb');
+            if (content) content.classList.add('active');
+        }
 
         // ====================== 动画循环 ======================
         let lastFrameTime = performance.now();
@@ -1944,27 +2452,31 @@
                 camera.position.y = cameraOrbitHeight;
             }
 
-            // 卫星轨道动画
+            // 卫星轨道动画（DEMO 示例卫星）
             updateSatellitePosition();
 
-            // 更新所有星座卫星位置
-            CONSTELLATIONS.forEach(cfg => {
-                if (cfg.visible && cfg.group) {
-                    updateConstellationPositions(cfg, new Date());
-                    cfg.group.rotation.y = earth.rotation.y;
-                }
-            });
+            // 更新所有星座卫星位置（Points 方式）
+            updateAllSatPositions(new Date());
 
-            // 呼吸闪烁（选中卫星）+ 轨道线跟随地球
+            // 更新高亮精灵位置 + 呼吸闪烁
             if (selectedSats.size > 0) {
-                const breath = 0.02 + 0.04 * (0.5 + 0.5 * Math.sin(currentTime / 400));
-                for (const [index, sel] of selectedSats) {
-                    // 在所有星座中查找选中的卫星
-                    for (const cfg of CONSTELLATIONS) {
-                        const sprite = cfg.sprites[index];
-                        if (sprite && sprite.userData.selected) {
-                            sprite.scale.set(breath, breath, 1);
-                            break;
+                const breath = 0.08 + 0.06 * (0.5 + 0.5 * Math.sin(currentTime / 400));
+                const now = new Date();
+                const gmst = satellite.gstime(now);
+                for (const [, sel] of selectedSats) {
+                    if (sel.sprite && sel.satrec) {
+                        const pv = satellite.propagate(sel.satrec, now);
+                        if (pv.position) {
+                            const gd = satellite.eciToGeodetic(pv.position, gmst);
+                            const r = (1.0 + gd.height / 6371.0) * orbitScaleFactor;
+                            const phi = Math.PI / 2 - gd.latitude;
+                            const theta = gd.longitude + Math.PI;
+                            sel.sprite.position.set(
+                                -r * Math.sin(phi) * Math.cos(theta),
+                                r * Math.cos(phi),
+                                r * Math.sin(phi) * Math.sin(theta)
+                            );
+                            sel.sprite.scale.set(breath, breath, 1);
                         }
                     }
                     if (sel.orbitLine) sel.orbitLine.rotation.y = earth.rotation.y;
@@ -1992,6 +2504,9 @@
         // 启动应用
         async function startApp() {
             // TEC 插值器已在声明时初始化，无需加载 GloTEC 数据
+
+            // 初始化星座系统
+            await initSatelliteSystem();
 
             // 加载预计算数据（动画已在底部启动）
             await loadData();
