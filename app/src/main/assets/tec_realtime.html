@@ -232,6 +232,44 @@
             transition: width 0.15s ease;
         }
 
+        #step-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        #step-label {
+            font-size: 10px;
+            color: #8899aa;
+            white-space: nowrap;
+        }
+        #step-options {
+            display: flex;
+            gap: 3px;
+            flex: 1;
+        }
+        .step-opt {
+            flex: 1;
+            text-align: center;
+            font-size: 10px;
+            padding: 3px 0;
+            background: #1a2a3a;
+            color: #667788;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .step-opt:hover {
+            background: #2a3a4a;
+            color: #88bbdd;
+        }
+        .step-opt.active {
+            background: #004488;
+            color: #ccddff;
+            font-weight: bold;
+        }
+
         /* 加载动画 */
         .loading-dots::after {
             content: '';
@@ -331,6 +369,14 @@
 
             <div class="panel-section" id="controls-section">
                 <button class="btn-primary" id="btnLoadRT">计算TEC</button>
+                <div id="step-selector">
+                    <span id="step-label">步长</span>
+                    <div id="step-options">
+                        <span class="step-opt active" data-step="1">1h</span>
+                        <span class="step-opt" data-step="0.5">30m</span>
+                        <span class="step-opt" data-step="0.1667">10m</span>
+                    </div>
+                </div>
                 <button class="btn-secondary" id="btnPredict24h">▶ 预测24小时TEC</button>
                 <div id="playback-status" style="display:none;">
                     <span id="playback-text"></span>
@@ -550,33 +596,44 @@
                     if (val !== '') memoryLags.dst[lag] = parseFloat(val);
                 });
 
+                // 读取步长选择
+                const activeStep = document.querySelector('.step-opt.active');
+                const stepHours = parseFloat(activeStep ? activeStep.dataset.step : '1');
+                const totalFrames = Math.round(24 / stepHours);
+
                 // 计算当前北京时间
                 const now = new Date();
                 const bjMs = now.getTime() + 8 * 3600000;
                 const bj = new Date(bjMs);
                 let baseBJDoy = Math.floor((bjMs - Date.UTC(bj.getUTCFullYear(), 0, 0)) / 86400000);
                 const baseBJYear = bj.getUTCFullYear();
-                let baseBJHour = bj.getUTCHours();
+                const baseBJHour = bj.getUTCHours();
+                const baseBJMin = bj.getUTCMinutes();
 
-                // 预计算未来24小时
+                // 预计算
                 playbackFrames = [];
                 playbackTimes = [];
 
-                for (let h = 0; h < 24; h++) {
-                    // 计算下一小时的北京日期/时
-                    let bjHour = (baseBJHour + h) % 24;
-                    let doyOffset = Math.floor((baseBJHour + h) / 24);
+                for (let i = 0; i < totalFrames; i++) {
+                    // 当前步的累计小时数
+                    const hoursOffset = i * stepHours;
+                    const totalBJHours = baseBJHour + baseBJMin / 60 + hoursOffset;
+                    const bjHourInt = Math.floor(totalBJHours) % 24;
+                    const bjMin = Math.round((totalBJHours - Math.floor(totalBJHours)) * 60);
+                    const doyOffset = Math.floor((baseBJHour + hoursOffset) / 24);
                     let doy = baseBJDoy + doyOffset;
                     let year = baseBJYear;
                     // 跨年处理
                     const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
                     if (doy > daysInYear) { doy -= daysInYear; year++; }
 
-                    // UTC 时（北京-8）
-                    let utHour = (bjHour - 8 + 24) % 24;
+                    // UTC 时（北京-8），取整小时供模型使用
+                    const utHour = (bjHourInt - 8 + 24) % 24;
+                    // 渲染用的精细 UT 时（含分钟）
+                    const utHourFrac = utHour + bjMin / 60;
 
-                    statusText.textContent = `⏳ 预计算中 ${h + 1}/24...`;
-                    fillBar.style.width = `${((h + 1) / 24) * 100}%`;
+                    statusText.textContent = `⏳ 预计算中 ${i + 1}/${totalFrames}...`;
+                    fillBar.style.width = `${((i + 1) / totalFrames) * 100}%`;
 
                     const geojson = await tecEngine.predict({
                         year, doy, ut_hour: utHour,
@@ -585,7 +642,7 @@
                     });
 
                     playbackFrames.push(geojson);
-                    playbackTimes.push({ year, doy, utHour, bjHour });
+                    playbackTimes.push({ year, doy, utHour: utHourFrac, bjHour: bjHourInt, bjMin });
                 }
 
                 // 预计算完成，开始播放
@@ -593,17 +650,20 @@
                 statusText.textContent = '▶ 播放中...';
 
                 // 立即显示第一帧
+                function fmtTime(t) {
+                    return `${String(t.bjHour).padStart(2, '0')}:${String(t.bjMin).padStart(2, '0')}`;
+                }
                 const first = playbackTimes[0];
                 renderTECMap(playbackFrames[0], first.doy, first.utHour);
-                statusText.textContent = `▶ 播放中  ${first.bjHour}:00 (1/24)`;
-                fillBar.style.width = `${(1 / 24) * 100}%`;
+                statusText.textContent = `▶ 播放中  ${fmtTime(first)} (1/${totalFrames})`;
+                fillBar.style.width = `${(1 / totalFrames) * 100}%`;
 
                 btn.disabled = false;
 
                 // 每隔 350ms 播放一帧
                 playbackTimer = setInterval(() => {
                     playbackIndex++;
-                    if (playbackIndex >= 24) {
+                    if (playbackIndex >= totalFrames) {
                         clearInterval(playbackTimer);
                         playbackTimer = null;
                         btn.textContent = '▶ 预测24小时TEC';
@@ -614,8 +674,8 @@
 
                     const t = playbackTimes[playbackIndex];
                     renderTECMap(playbackFrames[playbackIndex], t.doy, t.utHour);
-                    statusText.textContent = `▶ 播放中  ${t.bjHour}:00 (${playbackIndex + 1}/24)`;
-                    fillBar.style.width = `${((playbackIndex + 1) / 24) * 100}%`;
+                    statusText.textContent = `▶ 播放中  ${fmtTime(t)} (${playbackIndex + 1}/${totalFrames})`;
+                    fillBar.style.width = `${((playbackIndex + 1) / totalFrames) * 100}%`;
                 }, 350);
 
             } catch (e) {
@@ -922,6 +982,15 @@
         // ====================== 事件绑定 ======================
         document.getElementById('btnLoadRT').addEventListener('click', loadRealtimeTEC);
         document.getElementById('btnPredict24h').addEventListener('click', predict24hTEC);
+
+        // 步长选择切换
+        document.querySelectorAll('.step-opt').forEach(el => {
+            el.addEventListener('click', function() {
+                if (playbackTimer) return; // 播放中不可切换
+                document.querySelectorAll('.step-opt').forEach(s => s.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
 
         // 页面加载后自动加载一次
         window.addEventListener('load', function() {
