@@ -337,7 +337,7 @@
             transition: left 0.3s ease;
         }
         #controlsToggle {
-            width: 20px;
+            width: 24px;
             height: 44px;
             background: rgba(5,10,25,0.8);
             border: 1px solid rgba(68,136,170,0.25);
@@ -348,8 +348,10 @@
             cursor: pointer;
             pointer-events: auto;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 3px;
             padding: 0;
             margin: 0;
             line-height: 1;
@@ -359,6 +361,16 @@
             background: rgba(10,20,40,0.9);
             border-color: rgba(68,136,170,0.5);
             color: #aaccdd;
+        }
+        #controlsToggle .ctrl-label {
+            font-size: 11px;
+            opacity: 0.8;
+            letter-spacing: 2px;
+            line-height: 1;
+        }
+        #controlsToggle .ctrl-arrow {
+            font-size: 11px;
+            line-height: 1;
         }
         .legend {
             display: flex;
@@ -447,8 +459,8 @@
         #const-panel::-webkit-scrollbar { width: 3px; }
         #const-panel::-webkit-scrollbar-thumb { background: rgba(68,136,170,0.3); border-radius: 2px; }
         .const-panel-toggle {
-            width: 24px;
-            height: 60px;
+            width: 32px;
+            height: 76px;
             background: rgba(5,10,25,0.85);
             border: 1px solid rgba(68,136,170,0.3);
             border-left: none;
@@ -460,12 +472,13 @@
             flex-shrink: 0;
             align-self: center;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 4px;
             transition: all 0.15s;
             padding: 0;
             margin: 0;
-            writing-mode: vertical-lr;
             letter-spacing: 2px;
         }
         .const-panel-toggle:hover {
@@ -476,7 +489,14 @@
         .const-panel-toggle .arrow {
             display: inline-block;
             transition: transform 0.25s ease;
-            writing-mode: horizontal-tb;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .const-panel-toggle .const-label {
+            font-size: 11px;
+            line-height: 1;
+            opacity: 0.8;
+            letter-spacing: 2px;
         }
         .const-section-title {
             color: #667788;
@@ -568,7 +588,7 @@
                 <!-- 左侧星座选择面板 -->
                 <div id="const-panel-wrapper">
                     <div id="const-panel"></div>
-                    <button class="const-panel-toggle" id="constToggle" title="收起/展开星座面板"><span class="arrow">◀</span></button>
+                    <button class="const-panel-toggle" id="constToggle" title="收起/展开星座面板"><span class="arrow">◀</span><span class="const-label">星座</span></button>
                 </div>
                 <div id="controls-wrapper">
                     <div id="controls">
@@ -577,7 +597,7 @@
                         <button id="btnOrbitScale" class="toggle-btn">LEO 正常视图</button>
                         <button id="btnCameraOrbit" class="toggle-btn">相机环绕</button>
                     </div>
-                    <button id="controlsToggle" title="展开/收起工具箱">▶</button>
+                    <button id="controlsToggle" title="展开/收起工具箱"><span class="ctrl-label">工具</span><span class="ctrl-arrow">◀</span></button>
                 </div>
                 
             </div>
@@ -2731,18 +2751,19 @@
             const box = document.getElementById('controls');
             const toggle = document.getElementById('controlsToggle');
             if (!wrapper || !box || !toggle) return;
+            const arrow = toggle.querySelector('.ctrl-arrow');
             if (wrapper._state === 'collapsed') {
                 // 展开：恢复到初始位置
                 wrapper.style.left = (wrapper._expandLeft || 15) + 'px';
                 wrapper._state = 'expanded';
-                toggle.textContent = '▶';
+                if (arrow) arrow.textContent = '◀';
             } else {
                 // 收起：测量 controls 宽度，左移使 toggle 按钮刚好贴在右边界
                 const w = box.offsetWidth;
                 wrapper._expandLeft = wrapper.offsetLeft;
                 wrapper.style.left = (wrapper._expandLeft - w - 4) + 'px';
                 wrapper._state = 'collapsed';
-                toggle.textContent = '◀';
+                if (arrow) arrow.textContent = '▶';
             }
         }
 
