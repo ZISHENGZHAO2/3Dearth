@@ -454,43 +454,66 @@
 
         // ====================== 渲染 TEC 热力图 ======================
         function renderTECMap(geojson, doy, utHour) {
-            // 解析数据到网格
-            const tecGrid = {};
-            const lats = new Set(), lons = new Set();
+            // 解析数据到网格（已知 TEC 引擎网格：纬度 2.5° 间隔，经度 5° 间隔）
+            const latArr = [], lonArr = [];
+            const latSet = new Set(), lonSet = new Set();
+            // 第一遍扫描获取行列数
             for (const f of geojson.features) {
                 const [lon, lat] = f.geometry.coordinates;
-                const tec = f.properties.tec;
-                if (tec != null && !isNaN(tec)) {
-                    tecGrid[`${lat.toFixed(1)}_${lon.toFixed(1)}`] = tec;
-                    lats.add(lat);
-                    lons.add(lon);
-                }
+                latSet.add(lat);
+                lonSet.add(lon);
             }
-            const latArr = [...lats].sort((a, b) => a - b);
-            const lonArr = [...lons].sort((a, b) => a - b);
+            latArr.push(...latSet);
+            lonArr.push(...lonSet);
+            latArr.sort((a, b) => a - b);
+            lonArr.sort((a, b) => a - b);
 
             if (latArr.length < 2 || lonArr.length < 2) {
                 console.warn('[TEC] 数据不足以渲染');
                 return;
             }
 
+            const nLat = latArr.length, nLon = lonArr.length;
+            const latStep = (nLat > 1) ? (latArr[nLat - 1] - latArr[0]) / (nLat - 1) : 2.5;
+            const lonStep = (nLon > 1) ? (lonArr[nLon - 1] - lonArr[0]) / (nLon - 1) : 5;
+            const minLat = latArr[0], minLon = lonArr[0];
+
+            // 将 tecGrid 转为 Flat Float64Array（O(1) 索引访问，替代对象+字符串键）
+            const tecArray = new Float64Array(nLat * nLon);
+            for (const f of geojson.features) {
+                const [lon, lat] = f.geometry.coordinates;
+                const tec = f.properties.tec;
+                if (tec != null && !isNaN(tec)) {
+                    const i = Math.round((lat - minLat) / latStep);
+                    const j = Math.round((lon - minLon) / lonStep);
+                    if (i >= 0 && i < nLat && j >= 0 && j < nLon) {
+                        tecArray[i * nLon + j] = tec;
+                    }
+                }
+            }
+
+            // O(1) 双线性插值（数学索引代替 findIndex 线性搜索）
             function interpolateTec(lat, lon) {
-                let latIdx = latArr.findIndex(l => l >= lat);
-                let lonIdx = lonArr.findIndex(l => l >= lon);
-                if (latIdx < 0) latIdx = latArr.length - 1;
-                if (lonIdx < 0) lonIdx = lonArr.length - 1;
-                if (latIdx === 0) latIdx = 1;
-                if (lonIdx === 0) lonIdx = 1;
-                const lat0 = latArr[latIdx - 1], lat1 = latArr[latIdx];
-                const lon0 = lonArr[lonIdx - 1], lon1 = lonArr[lonIdx];
-                const e00 = tecGrid[`${lat0.toFixed(1)}_${lon0.toFixed(1)}`] || 0;
-                const e10 = tecGrid[`${lat1.toFixed(1)}_${lon0.toFixed(1)}`] || 0;
-                const e01 = tecGrid[`${lat0.toFixed(1)}_${lon1.toFixed(1)}`] || 0;
-                const e11 = tecGrid[`${lat1.toFixed(1)}_${lon1.toFixed(1)}`] || 0;
-                const tx = (lon1 !== lon0) ? (lon - lon0) / (lon1 - lon0) : 0;
-                const ty = (lat1 !== lat0) ? (lat - lat0) / (lat1 - lat0) : 0;
-                return e00 * (1 - tx) * (1 - ty) + e10 * (1 - tx) * ty +
-                       e01 * tx * (1 - ty) + e11 * tx * ty;
+                const fi = (lat - minLat) / latStep;
+                const fj = (lon - minLon) / lonStep;
+                let i0 = Math.floor(fi);
+                let j0 = Math.floor(fj);
+                i0 = Math.max(0, Math.min(i0, nLat - 2));
+                j0 = Math.max(0, Math.min(j0, nLon - 2));
+
+                const fracI = fi - i0;
+                const fracJ = fj - j0;
+                const stride = nLon;
+                const idx00 = i0 * stride + j0;
+                const e00 = tecArray[idx00];
+                const e10 = tecArray[idx00 + stride];
+                const e01 = tecArray[idx00 + 1];
+                const e11 = tecArray[idx00 + stride + 1];
+
+                return e00 * (1 - fracI) * (1 - fracJ) +
+                       e10 * fracI * (1 - fracJ) +
+                       e01 * (1 - fracI) * fracJ +
+                       e11 * fracI * fracJ;
             }
 
             // 第一步：画地球背景（裁剪到地图内矩形区域）
