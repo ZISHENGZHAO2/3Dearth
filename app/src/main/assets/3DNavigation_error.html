@@ -235,6 +235,32 @@
             color: #556677;
         }
 
+        /* 自定义弹出框 */
+        .sat-toast {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: rgba(10,20,40,0.97);
+            border: 1px solid rgba(255,170,68,0.5);
+            border-radius: 10px;
+            padding: 20px 28px;
+            z-index: 9999;
+            text-align: center;
+            max-width: 300px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            animation: toastIn 0.25s ease;
+        }
+        .sat-toast p { color: #ccddee; font-size: 13px; line-height: 1.6; margin: 0 0 14px 0; }
+        .sat-toast button {
+            background: rgba(68,136,255,0.25);
+            border: 1px solid rgba(68,136,255,0.4);
+            color: #88bbff;
+            padding: 6px 24px;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .sat-toast button:hover { background: rgba(68,136,255,0.35); }
+        @keyframes toastIn { from { opacity:0; transform:translate(-50%,-50%) scale(0.9); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
+
         /* 参数行 */
         .param-row {
             display: flex;
@@ -276,18 +302,15 @@
         }
 
         #controls {
-            position: absolute;
-            bottom: 20px;
-            left: 15px;
             background: rgba(0,0,0,0.85);
             padding: 12px;
             border-radius: 10px;
             color: white;
-            z-index: 1000;
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
             border: 1px solid rgba(100,180,255,0.3);
+            pointer-events: auto;
         }
         #controls button {
             flex: 0 0 auto;
@@ -295,7 +318,41 @@
             font-size: 12px;
             padding: 6px 10px;
         }
-
+        #controls-wrapper {
+            position: absolute;
+            bottom: 20px;
+            left: 15px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            pointer-events: none;
+            transition: left 0.3s ease;
+        }
+        #controlsToggle {
+            width: 20px;
+            height: 44px;
+            background: rgba(5,10,25,0.8);
+            border: 1px solid rgba(68,136,170,0.25);
+            border-left: none;
+            border-radius: 0 6px 6px 0;
+            color: #5599bb;
+            font-size: 11px;
+            cursor: pointer;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            line-height: 1;
+            transition: color 0.2s, background 0.2s, border-color 0.2s;
+        }
+        #controlsToggle:hover {
+            background: rgba(10,20,40,0.9);
+            border-color: rgba(68,136,170,0.5);
+            color: #aaccdd;
+        }
         .legend {
             display: flex;
             align-items: center;
@@ -414,9 +471,6 @@
             transition: transform 0.25s ease;
             writing-mode: horizontal-tb;
         }
-        #const-panel-wrapper.collapsed .const-panel-toggle .arrow {
-            transform: rotate(180deg);
-        }
         .const-section-title {
             color: #667788;
             font-size: 10px;
@@ -507,13 +561,16 @@
                 <!-- 左侧星座选择面板 -->
                 <div id="const-panel-wrapper">
                     <div id="const-panel"></div>
-                    <button class="const-panel-toggle" id="constToggle" title="收起/展开星座面板"><span class="arrow">◀</span> 星座</button>
+                    <button class="const-panel-toggle" id="constToggle" title="收起/展开星座面板"><span class="arrow">◀</span></button>
                 </div>
-                <div id="controls">
-                    <button id="btnGrid" class="toggle-btn active">关闭网格</button>
-                    <button id="btnCloud" class="toggle-btn">开启云层</button>
-                    <button id="btnOrbitScale" class="toggle-btn">LEO 正常视图</button>
-                    <button id="btnCameraOrbit" class="toggle-btn">相机环绕</button>
+                <div id="controls-wrapper">
+                    <div id="controls">
+                        <button id="btnGrid" class="toggle-btn active">关闭网格</button>
+                        <button id="btnCloud" class="toggle-btn">开启云层</button>
+                        <button id="btnOrbitScale" class="toggle-btn">LEO 正常视图</button>
+                        <button id="btnCameraOrbit" class="toggle-btn">相机环绕</button>
+                    </div>
+                    <button id="controlsToggle" title="展开/收起工具箱">▶</button>
                 </div>
                 
             </div>
@@ -1461,7 +1518,7 @@
                                now.getSeconds().toString().padStart(2, '0');
 
             const utcEl = document.getElementById('utcTime');
-            const beijingEl = document.getElementById('beijingTime');
+            const beijingEl = document.getElementById('beijingClock');
             if (utcEl) utcEl.textContent = utcTimeStr;
             if (beijingEl) beijingEl.textContent = beijingTimeStr;
 
@@ -1694,8 +1751,14 @@
         let CONSTELLATIONS = [];
         // 所有卫星数据的原始 lines（已去注释）
         let _allTLEData = null;
+        // 全局索引 → {cfg, localIdx, name} 直接映射（解决交错排列问题）
+        let _satMap = null;
+        let _totalSats = 0;
         // 选中卫星 Map<index, { orbitLine, constId, sprite }>
         const selectedSats = new Map();
+        // 显示列表模式（"全部隐藏"后激活）
+        let _listMode = false;
+        let _displayList = new Set(); // 在此列表中的卫星才显示
 
         // ---------- 1. 获取所有 TLE 数据（只加载一次） ----------
         async function loadAllTLE() {
@@ -1837,10 +1900,8 @@
         function assignSatellites(cfgs) {
             const lines = _allTLEData;
             let globalIdx = 0;
-
-            // 记录每个星座首次出现的 globalIdx
-            const firstIdx = {};
-            for (const cfg of cfgs) firstIdx[cfg.id] = -1;
+            const satMap = new Map();
+            let nextId = 0;
 
             for (let i = 0; i <= lines.length - 3; i += 3) {
                 const nameLine = lines[i].trim();
@@ -1853,16 +1914,19 @@
                 try {
                     const satrec = satellite.twoline2satrec(line1, line2);
                     satrec.name = nameLine;
+                    satrec._satId = nextId; // 标记唯一 ID
                     if (cfg) {
-                        if (firstIdx[cfg.id] === -1) firstIdx[cfg.id] = globalIdx;
                         cfg.satrecs.push(satrec);
+                        satMap.set(nextId, { cfg, localIdx: cfg.satrecs.length - 1, name: nameLine });
+                        nextId++;
                     }
                 } catch(_) {}
                 globalIdx++;
             }
 
-            // 设置每个星座的正确起始索引
-            for (const cfg of cfgs) cfg._startIdx = firstIdx[cfg.id] || 0;
+            // 保存全局映射
+            _satMap = satMap;
+            _totalSats = nextId;
 
             // 去掉没有卫星的星座
             return cfgs.filter(c => c.satrecs.length > 0);
@@ -1922,7 +1986,9 @@
         function updateAllSatPositions(now) {
             const gmst = satellite.gstime(now);
             for (const cfg of CONSTELLATIONS) {
-                if (!cfg.visible || !cfg._positions) continue;
+                // 列表模式下即使 cfg.visible=false 也要更新位置（由 _hidden 控制）
+                if (!_listMode && !cfg.visible) continue;
+                if (!cfg._positions || !cfg._pointsObj) continue;
                 const positions = cfg._positions;
                 const satrecs = cfg.satrecs;
                 const hidden = cfg._hidden;
@@ -1957,15 +2023,51 @@
             const panel = document.getElementById('const-panel');
             panel.innerHTML = '';
 
-            // 全选/取消按钮
+            // 全选/取消 → 全部显示/全部隐藏（来回切换）
             const allBtn = document.createElement('button');
             allBtn.className = 'const-check-all';
-            allBtn.textContent = '☑ 全部';
+            // 初始状态：全部可见 → "全部隐藏"，否则 → "全部显示"
+            {
+                const allVisible = cfgs.every(c => c.visible);
+                allBtn.textContent = allVisible ? '🔘 全部隐藏' : '◯ 全部显示';
+            }
             allBtn.addEventListener('click', () => {
                 const anyOff = cfgs.some(c => !c.visible);
-                for (const cfg of cfgs) {
-                    cfg.visible = anyOff;
-                    if (cfg._pointsObj) cfg._pointsObj.visible = anyOff;
+                if (anyOff) {
+                    // 有隐藏的 → 全部显示：退出列表模式
+                    for (const cfg of cfgs) {
+                        cfg.visible = true;
+                        if (cfg._pointsObj) cfg._pointsObj.visible = true;
+                    }
+                    _listMode = false;
+                    _displayList.clear();
+                    syncDisplayList();
+                    updateDisplayListBtns();
+                    // 显示所有轨道线和光晕
+                    for (const [, sel] of selectedSats) {
+                        if (sel.orbitLine) sel.orbitLine.visible = true;
+                        if (sel.sprite) sel.sprite.visible = true;
+                    }
+                    allBtn.textContent = '🔘 全部隐藏';
+                } else {
+                    // 全部显示中 → 全部隐藏：进入列表模式
+                    for (const cfg of cfgs) {
+                        cfg.visible = false;
+                        if (cfg._pointsObj) cfg._pointsObj.visible = false;
+                    }
+                    _listMode = true;
+                    // 列表模式下强制所有 Points 可见（由 _hidden 控制具体卫星）
+                    for (const cfg of cfgs) {
+                        if (cfg._pointsObj) cfg._pointsObj.visible = true;
+                    }
+                    syncDisplayList();
+                    updateDisplayListBtns();
+                    // 隐藏所有轨道线和光晕（列表模式由用户控制）
+                    for (const [, sel] of selectedSats) {
+                        if (sel.orbitLine) sel.orbitLine.visible = false;
+                        if (sel.sprite) sel.sprite.visible = false;
+                    }
+                    allBtn.textContent = '◯ 全部显示';
                 }
                 buildConstPanel(cfgs);
             });
@@ -2002,6 +2104,13 @@
                     cfg.visible = cb.checked;
                     if (cfg._pointsObj) cfg._pointsObj.visible = cfg.visible;
                     el.classList.toggle('checked', cfg.visible);
+                    // 同步该星座选中的轨道线和光晕可见性
+                    for (const [, sel] of selectedSats) {
+                        if (sel.cfg === cfg) {
+                            if (sel.orbitLine) sel.orbitLine.visible = cfg.visible;
+                            if (sel.sprite) sel.sprite.visible = cfg.visible;
+                        }
+                    }
                 });
 
                 panel.appendChild(el);
@@ -2155,8 +2264,9 @@
             const satrec = cfg.satrecs[pointIdx];
             if (!satrec) return;
 
-            // 计算全局索引
-            const globalIdx = cfg._startIdx + pointIdx;
+            // 使用 satrec._satId 作为全局唯一索引（来自 _satMap）
+            const globalIdx = satrec._satId;
+            if (globalIdx === undefined) return;
 
             if (selectedSats.has(globalIdx)) {
                 deselectSat(globalIdx);
@@ -2190,14 +2300,12 @@
         sceneArea.addEventListener('pointerup', onSatelliteClick);
 
         // ---------- 10. 仪表盘——全卫星列表（折叠型） ----------
-        /** 通过全局索引找到星座配置和卫星数据 */
+        /** 通过全局索引找到星座配置和卫星数据（使用直接映射表） */
         function findSatelliteByGlobalIdx(globalIdx) {
-            for (const c of CONSTELLATIONS) {
-                if (globalIdx >= c._startIdx && globalIdx < c._startIdx + c.satrecs.length) {
-                    return { cfg: c, satrec: c.satrecs[globalIdx - c._startIdx] };
-                }
-            }
-            return null;
+            const entry = _satMap ? _satMap.get(globalIdx) : null;
+            if (!entry) return null;
+            const satrec = entry.cfg.satrecs[entry.localIdx];
+            return { cfg: entry.cfg, satrec };
         }
 
         /** 创建一颗卫星的卡片（仅头部 + 空详情体，展开时懒填充） */
@@ -2291,8 +2399,8 @@
                 <div class="sat-card-row"><span class="sat-card-label">纬度</span><span class="sat-card-value">${latDeg >= 0 ? latDeg.toFixed(2)+'°N' : Math.abs(latDeg).toFixed(2)+'°S'}</span></div>
                 <div class="sat-card-row"><span class="sat-card-label">经度</span><span class="sat-card-value">${lonDeg >= 0 ? lonDeg.toFixed(2)+'°E' : Math.abs(lonDeg).toFixed(2)+'°W'}</span></div>
                 <div style="display:flex;gap:4px;margin-top:6px">
-                    <button class="sat-card-action" data-action="show-only" data-idx="${globalIdx}" style="flex:1;font-size:10px;background:rgba(68,136,170,0.2);border:1px solid rgba(68,136,170,0.3);color:#88bbdd;padding:3px 6px;border-radius:3px;cursor:pointer">只显示这颗</button>
-                    <button class="sat-card-action" data-action="hide" data-idx="${globalIdx}" style="flex:1;font-size:10px;background:rgba(255,68,68,0.15);border:1px solid rgba(255,68,68,0.3);color:#ff6666;padding:3px 6px;border-radius:3px;cursor:pointer">隐藏这颗</button>
+                    <button class="sat-card-action dlist-btn" data-action="toggle-dlist" data-idx="${globalIdx}" style="flex:1;font-size:10px;background:rgba(68,136,255,0.15);border:1px solid rgba(68,136,255,0.3);color:#6688ff;padding:3px 6px;border-radius:3px;cursor:pointer">加入显示列表</button>
+                    <button class="sat-card-action toggle-hide" data-action="toggle-hide" data-idx="${globalIdx}" style="flex:1;font-size:10px;background:rgba(255,68,68,0.15);border:1px solid rgba(255,68,68,0.3);color:#ff6666;padding:3px 6px;border-radius:3px;cursor:pointer">隐藏卫星</button>
                 </div>
             `;
             body.querySelectorAll('.sat-card-action').forEach(btn => {
@@ -2300,19 +2408,48 @@
                     e.stopPropagation();
                     const idx = parseInt(e.target.dataset.idx);
                     const action = e.target.dataset.action;
-                    const sel2 = selectedSats.get(idx);
-                    if (!sel2) return;
-                    const c = sel2.cfg;
-                    const localIdx = idx - c._startIdx;
-                    if (action === 'hide') {
-                        c._hidden[localIdx] = 1;
-                        deselectSat(idx);
-                        updateSatDashboard();
-                    } else if (action === 'show-only') {
-                        c._hidden.fill(1);
-                        c._hidden[localIdx] = 0;
-                        deselectSat(idx);
-                        updateSatDashboard();
+                    const entry = _satMap ? _satMap.get(idx) : null;
+                    if (!entry) return;
+                    const c = entry.cfg;
+                    const localIdx = entry.localIdx;
+                    if (localIdx < 0) return;
+                    if (action === 'toggle-hide') {
+                        const hidden = c._hidden[localIdx];
+                        const sel = selectedSats.get(idx);
+                        if (hidden) {
+                            c._hidden[localIdx] = 0;
+                            if (sel) {
+                                if (sel.orbitLine) sel.orbitLine.visible = true;
+                                if (sel.sprite) sel.sprite.visible = true;
+                            }
+                            e.target.textContent = '隐藏卫星';
+                            e.target.style.color = '#ff6666';
+                            e.target.style.borderColor = 'rgba(255,68,68,0.3)';
+                            e.target.style.background = 'rgba(255,68,68,0.15)';
+                        } else {
+                            c._hidden[localIdx] = 1;
+                            if (sel) {
+                                if (sel.orbitLine) sel.orbitLine.visible = false;
+                                if (sel.sprite) sel.sprite.visible = false;
+                            }
+                            e.target.textContent = '显示卫星';
+                            e.target.style.color = '#66ff88';
+                            e.target.style.borderColor = 'rgba(68,255,136,0.3)';
+                            e.target.style.background = 'rgba(68,255,136,0.15)';
+                        }
+                    } else if (action === 'toggle-dlist') {
+                        // 显示列表模式
+                        if (!_listMode) {
+                            showToast('请先点击左侧星座选择界面中的<b>全部隐藏</b>按钮');
+                            return;
+                        }
+                        if (_displayList.has(idx)) {
+                            _displayList.delete(idx);
+                        } else {
+                            _displayList.add(idx);
+                        }
+                        syncDisplayList();
+                        updateDisplayListBtns();
                     }
                 });
             });
@@ -2329,13 +2466,15 @@
             for (const cfg of CONSTELLATIONS) cfg._cards = [];
 
             const frag = document.createDocumentFragment();
-            for (const cfg of CONSTELLATIONS) {
-                for (let i = 0; i < cfg.satrecs.length; i++) {
-                    const card = createSatCard(cfg._startIdx + i);
-                    if (card) {
-                        cfg._cards.push(card);
-                        frag.appendChild(card);
-                    }
+            // 使用 _satMap 顺序创建卡片（确保 ID 与实际卫星一一对应）
+            for (let id = 0; id < _totalSats; id++) {
+                const entry = _satMap ? _satMap.get(id) : null;
+                if (!entry) continue;
+                const cfg = entry.cfg;
+                const card = createSatCard(id);
+                if (card) {
+                    cfg._cards.push(card);
+                    frag.appendChild(card);
                 }
             }
             container.appendChild(frag);
@@ -2410,6 +2549,55 @@
             container.scrollTop = 0;
         }
 
+        /** 弹出提示框 */
+        function showToast(msg) {
+            const old = document.querySelector('.sat-toast');
+            if (old) old.remove();
+            const div = document.createElement('div');
+            div.className = 'sat-toast';
+            div.innerHTML = `<p>${msg}</p><button>知道了</button>`;
+            div.querySelector('button').addEventListener('click', () => div.remove());
+            document.body.appendChild(div);
+        }
+
+        /** 同步显示列表 → _hidden 数组 */
+        function syncDisplayList() {
+            for (const cfg of CONSTELLATIONS) {
+                if (!cfg._hidden) continue;
+                for (let i = 0; i < cfg.satrecs.length; i++) {
+                    const satId = cfg.satrecs[i]._satId;
+                    if (_listMode) {
+                        cfg._hidden[i] = _displayList.has(satId) ? 0 : 1;
+                    } else {
+                        cfg._hidden[i] = 0;
+                    }
+                }
+                if (cfg._pointsObj && cfg._pointsObj.geometry.attributes.position) {
+                    cfg._pointsObj.geometry.attributes.position.needsUpdate = true;
+                }
+            }
+        }
+
+        /** 更新所有仪表盘卡片的显示列表按钮文字 */
+        function updateDisplayListBtns() {
+            document.querySelectorAll('.sat-card').forEach(card => {
+                const idx = parseInt(card.dataset.idx);
+                const btn = card.querySelector('.dlist-btn');
+                if (!btn) return;
+                if (_displayList.has(idx)) {
+                    btn.textContent = '取消显示';
+                    btn.style.background = 'rgba(255,136,68,0.2)';
+                    btn.style.borderColor = 'rgba(255,136,68,0.3)';
+                    btn.style.color = '#ff8844';
+                } else {
+                    btn.textContent = '加入显示列表';
+                    btn.style.background = 'rgba(68,136,255,0.15)';
+                    btn.style.borderColor = 'rgba(68,136,255,0.3)';
+                    btn.style.color = '#6688ff';
+                }
+            });
+        }
+
         // ---------- 11. 右侧标签页 ----------
         document.querySelectorAll('.right-tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -2431,6 +2619,7 @@
 
         // ====================== 动画循环 ======================
         let lastFrameTime = performance.now();
+        let _frameCount = 0;
 
         function animate() {
             requestAnimationFrame(animate);
@@ -2455,8 +2644,11 @@
             // 卫星轨道动画（DEMO 示例卫星）
             updateSatellitePosition();
 
-            // 更新所有星座卫星位置（Points 方式）
-            updateAllSatPositions(new Date());
+            // 降低更新频率：每 3 帧更新一次所有卫星位置（减轻低端 GPU 负载）
+            _frameCount++;
+            if (_frameCount % 3 === 0) {
+                updateAllSatPositions(new Date());
+            }
 
             // 更新高亮精灵位置 + 呼吸闪烁
             if (selectedSats.size > 0) {
@@ -2513,6 +2705,35 @@
 
             console.log('[Info] 应用启动完成');
         }
+
+        // 控制面板展开/收起（与星座面板相同逻辑）
+        function toggleControlsPanel() {
+            const wrapper = document.getElementById('controls-wrapper');
+            const box = document.getElementById('controls');
+            const toggle = document.getElementById('controlsToggle');
+            if (!wrapper || !box || !toggle) return;
+            if (wrapper._state === 'collapsed') {
+                // 展开：恢复到初始位置
+                wrapper.style.left = (wrapper._expandLeft || 15) + 'px';
+                wrapper._state = 'expanded';
+                toggle.textContent = '▶';
+            } else {
+                // 收起：测量 controls 宽度，左移使 toggle 按钮刚好贴在右边界
+                const w = box.offsetWidth;
+                wrapper._expandLeft = wrapper.offsetLeft;
+                wrapper.style.left = (wrapper._expandLeft - w - 4) + 'px';
+                wrapper._state = 'collapsed';
+                toggle.textContent = '◀';
+            }
+        }
+
+        // 注册控制面板收起/展开按钮点击事件
+        (function initControlsToggle() {
+            const toggleBtn = document.getElementById('controlsToggle');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', toggleControlsPanel);
+            }
+        })();
 
         startApp();
 

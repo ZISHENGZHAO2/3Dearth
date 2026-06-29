@@ -249,23 +249,6 @@
 
         <!-- 右侧：控制面板 -->
         <div id="control-panel">
-            <div class="panel-section">
-                <div class="section-title">🕐 北京时间（整点自动刷新）</div>
-                <div class="time-grid">
-                    <div class="time-item">
-                        <div class="label">北京日期</div>
-                        <div class="value" id="rtDate" style="font-size:14px;">--</div>
-                    </div>
-                    <div class="time-item">
-                        <div class="label">北京时</div>
-                        <div class="value" id="rtBJHour">--</div>
-                    </div>
-                    <div class="time-item">
-                        <div class="label">UT 时</div>
-                        <div class="value" id="rtHour" style="color:#667788;">--</div>
-                    </div>
-                </div>
-            </div>
 
             <div class="panel-section">
                 <div class="section-title">☀️ 太阳 / 地磁参数</div>
@@ -424,11 +407,6 @@
             const bjHour = bj.getUTCHours();
             const startOfYear = Date.UTC(bjYear, 0, 0);
             const bjDoy = Math.floor((bjMs - startOfYear) / 86400000);
-
-            document.getElementById('rtDate').textContent =
-                bjYear + '-' + String(bjMonth).padStart(2,'0') + '-' + String(bjDay).padStart(2,'0');
-            document.getElementById('rtBJHour').textContent = String(bjHour).padStart(2,'0') + ':00';
-            document.getElementById('rtHour').textContent = bjHour;
 
             // 直接使用北京时间作为模型输入
             return { year: bjYear, doy: bjDoy, ut_hour: bjHour };
