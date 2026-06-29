@@ -2248,7 +2248,7 @@
             if (event.target !== renderer.domElement) return;
 
             const allPoints = CONSTELLATIONS
-                .filter(c => c.visible && c._pointsObj)
+                .filter(c => (c.visible || _listMode) && c._pointsObj)
                 .map(c => c._pointsObj);
             if (allPoints.length === 0) return;
 
@@ -2452,8 +2452,20 @@
                         }
                         if (_displayList.has(idx)) {
                             _displayList.delete(idx);
+                            // 如果该卫星已被选中，隐藏其轨道线和精灵
+                            if (selectedSats.has(idx)) {
+                                const sel = selectedSats.get(idx);
+                                if (sel.orbitLine) sel.orbitLine.visible = false;
+                                if (sel.sprite) sel.sprite.visible = false;
+                            }
                         } else {
                             _displayList.add(idx);
+                            // 如果该卫星之前被选中，恢复轨道线和精灵的显示
+                            if (selectedSats.has(idx)) {
+                                const sel = selectedSats.get(idx);
+                                if (sel.orbitLine) sel.orbitLine.visible = true;
+                                if (sel.sprite) sel.sprite.visible = true;
+                            }
                         }
                         syncDisplayList();
                         updateDisplayListBtns();
