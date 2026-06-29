@@ -187,6 +187,51 @@
             color: #888;
         }
 
+        .btn-secondary {
+            width: 100%;
+            padding: 7px;
+            background: linear-gradient(135deg, #cc7700, #aa5500);
+            border: none;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            margin-top: 5px;
+        }
+        .btn-secondary:hover { background: linear-gradient(135deg, #ee8800, #cc6600); }
+        .btn-secondary:disabled {
+            background: #554433;
+            cursor: not-allowed;
+            color: #888;
+        }
+
+        #playback-status {
+            margin-top: 6px;
+            text-align: center;
+        }
+        #playback-text {
+            font-size: 10px;
+            color: #88bbdd;
+            display: block;
+            margin-bottom: 3px;
+        }
+        #playback-bar {
+            width: 100%;
+            height: 4px;
+            background: #1a2a3a;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        #playback-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #0066cc, #00ccff);
+            border-radius: 2px;
+            transition: width 0.15s ease;
+        }
+
         /* 加载动画 */
         .loading-dots::after {
             content: '';
@@ -284,8 +329,13 @@
                 </div>
             </div>
 
-            <div class="panel-section">
+            <div class="panel-section" id="controls-section">
                 <button class="btn-primary" id="btnLoadRT">计算TEC</button>
+                <button class="btn-secondary" id="btnPredict24h">▶ 预测24小时TEC</button>
+                <div id="playback-status" style="display:none;">
+                    <span id="playback-text"></span>
+                    <div id="playback-bar"><div id="playback-fill"></div></div>
+                </div>
             </div>
         </div>
     </div>
@@ -449,6 +499,130 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = '计算TEC';
+            }
+        }
+
+        // ====================== 24小时TEC预测与播放 ======================
+        let playbackTimer = null;
+        let playbackFrames = [];
+        let playbackIndex = 0;
+        let playbackTimes = [];
+
+        async function predict24hTEC() {
+            const btn = document.getElementById('btnPredict24h');
+            const statusDiv = document.getElementById('playback-status');
+            const statusText = document.getElementById('playback-text');
+            const fillBar = document.getElementById('playback-fill');
+
+            // 若正在播放则停止
+            if (playbackTimer) {
+                clearInterval(playbackTimer);
+                playbackTimer = null;
+                btn.textContent = '▶ 预测24小时TEC';
+                btn.disabled = false;
+                statusDiv.style.display = 'none';
+                return;
+            }
+
+            btn.textContent = '⏹ 停止播放';
+            btn.disabled = true;
+            statusDiv.style.display = 'block';
+            statusText.textContent = '⏳ 预计算中...';
+            fillBar.style.width = '0%';
+
+            try {
+                if (!tecEngineReady) {
+                    statusText.textContent = '⚠️ TEC 引擎初始化中，请稍后...';
+                    btn.disabled = false;
+                    btn.textContent = '▶ 预测24小时TEC';
+                    return;
+                }
+
+                // 读取当前输入参数
+                const f107 = parseFloat(document.getElementById('rtF107').value) || 150;
+                const f107a = parseFloat(document.getElementById('rtF107A').value) || 145;
+                const dst = parseFloat(document.getElementById('rtDst').value) || 0;
+                const ap = parseFloat(document.getElementById('rtAp').value) || 2;
+                const kp = parseFloat(document.getElementById('rtKp').value) || 1.3;
+                const memoryLags = { dst: {} };
+                [1, 3, 6, 12, 24].forEach(lag => {
+                    const val = document.getElementById(`rtDstLag${lag}`).value;
+                    if (val !== '') memoryLags.dst[lag] = parseFloat(val);
+                });
+
+                // 计算当前北京时间
+                const now = new Date();
+                const bjMs = now.getTime() + 8 * 3600000;
+                const bj = new Date(bjMs);
+                let baseBJDoy = Math.floor((bjMs - Date.UTC(bj.getUTCFullYear(), 0, 0)) / 86400000);
+                const baseBJYear = bj.getUTCFullYear();
+                let baseBJHour = bj.getUTCHours();
+
+                // 预计算未来24小时
+                playbackFrames = [];
+                playbackTimes = [];
+
+                for (let h = 0; h < 24; h++) {
+                    // 计算下一小时的北京日期/时
+                    let bjHour = (baseBJHour + h) % 24;
+                    let doyOffset = Math.floor((baseBJHour + h) / 24);
+                    let doy = baseBJDoy + doyOffset;
+                    let year = baseBJYear;
+                    // 跨年处理
+                    const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
+                    if (doy > daysInYear) { doy -= daysInYear; year++; }
+
+                    // UTC 时（北京-8）
+                    let utHour = (bjHour - 8 + 24) % 24;
+
+                    statusText.textContent = `⏳ 预计算中 ${h + 1}/24...`;
+                    fillBar.style.width = `${((h + 1) / 24) * 100}%`;
+
+                    const geojson = await tecEngine.predict({
+                        year, doy, ut_hour: utHour,
+                        drivers: { f107, f107a, dst, ap, kp },
+                        memory_lags: memoryLags,
+                    });
+
+                    playbackFrames.push(geojson);
+                    playbackTimes.push({ year, doy, utHour, bjHour });
+                }
+
+                // 预计算完成，开始播放
+                playbackIndex = 0;
+                statusText.textContent = '▶ 播放中...';
+
+                // 立即显示第一帧
+                const first = playbackTimes[0];
+                renderTECMap(playbackFrames[0], first.doy, first.utHour);
+                statusText.textContent = `▶ 播放中  ${first.bjHour}:00 (1/24)`;
+                fillBar.style.width = `${(1 / 24) * 100}%`;
+
+                btn.disabled = false;
+
+                // 每隔 350ms 播放一帧
+                playbackTimer = setInterval(() => {
+                    playbackIndex++;
+                    if (playbackIndex >= 24) {
+                        clearInterval(playbackTimer);
+                        playbackTimer = null;
+                        btn.textContent = '▶ 预测24小时TEC';
+                        statusText.textContent = '✅ 播放完成';
+                        fillBar.style.width = '100%';
+                        return;
+                    }
+
+                    const t = playbackTimes[playbackIndex];
+                    renderTECMap(playbackFrames[playbackIndex], t.doy, t.utHour);
+                    statusText.textContent = `▶ 播放中  ${t.bjHour}:00 (${playbackIndex + 1}/24)`;
+                    fillBar.style.width = `${((playbackIndex + 1) / 24) * 100}%`;
+                }, 350);
+
+            } catch (e) {
+                console.error('[24h TEC] 预测失败:', e);
+                statusText.textContent = '❌ 预测失败';
+                btn.disabled = false;
+                btn.textContent = '▶ 预测24小时TEC';
             }
         }
 
@@ -747,6 +921,7 @@
 
         // ====================== 事件绑定 ======================
         document.getElementById('btnLoadRT').addEventListener('click', loadRealtimeTEC);
+        document.getElementById('btnPredict24h').addEventListener('click', predict24hTEC);
 
         // 页面加载后自动加载一次
         window.addEventListener('load', function() {
@@ -756,7 +931,7 @@
             }, 500);
         });
 
-        // 每小时自动刷新
+        // 每小时自动刷新（播放 24h TEC 时暂不自动刷新）
         function scheduleHourlyRefresh() {
             const now = new Date();
             // 计算到下一个整点（北京时间）的毫秒数
@@ -767,14 +942,18 @@
             const msUntilNext = nextHour.getTime() - bjMs;
 
             setTimeout(() => {
-                console.log('[RT TEC] 整点刷新');
-                updateRTTime();
-                loadRealtimeTEC();
-                // 之后每小时刷新一次
-                setInterval(() => {
-                    console.log('[RT TEC] 每小时自动刷新');
+                if (!playbackTimer) {
+                    console.log('[RT TEC] 整点刷新');
                     updateRTTime();
                     loadRealtimeTEC();
+                }
+                // 之后每小时刷新一次
+                setInterval(() => {
+                    if (!playbackTimer) {
+                        console.log('[RT TEC] 每小时自动刷新');
+                        updateRTTime();
+                        loadRealtimeTEC();
+                    }
                 }, 3600000);
             }, msUntilNext);
 
