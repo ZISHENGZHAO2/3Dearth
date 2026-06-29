@@ -95,14 +95,14 @@
             overflow-y: auto;
         }
         .panel-section {
-            padding: 14px;
+            padding: 10px;
             border-bottom: 1px solid rgba(68,136,170,0.2);
         }
         .section-title {
             color: #88bbdd;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
             letter-spacing: 0.5px;
         }
 
@@ -135,85 +135,56 @@
         .param-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 5px;
         }
         .param-item {
             background: rgba(0,0,0,0.3);
             border: 1px solid rgba(68,136,170,0.2);
-            border-radius: 6px;
-            padding: 8px;
+            border-radius: 5px;
+            padding: 5px 7px;
         }
         .param-item label {
             display: block;
             color: #667788;
-            font-size: 10px;
-            margin-bottom: 4px;
+            font-size: 9px;
+            margin-bottom: 2px;
         }
         .param-item input {
             width: 100%;
             background: rgba(255,255,255,0.08);
             border: 1px solid rgba(68,136,170,0.4);
             color: #fff;
-            padding: 4px 6px;
-            border-radius: 4px;
-            font-size: 12px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 11px;
             text-align: right;
         }
         .param-item input:focus { border-color: #88ccff; outline: none; }
         .param-item .unit {
             color: #667788;
-            font-size: 10px;
+            font-size: 9px;
             float: right;
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
         .btn-primary {
             width: 100%;
-            padding: 10px;
+            padding: 8px;
             background: linear-gradient(135deg, #0066cc, #0044aa);
             border: none;
             color: white;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
-            border-radius: 6px;
+            border-radius: 5px;
             cursor: pointer;
             letter-spacing: 1px;
-            margin-top: 6px;
+            margin-top: 4px;
         }
         .btn-primary:hover { background: linear-gradient(135deg, #0088ff, #0066cc); }
         .btn-primary:disabled {
             background: #334455;
             cursor: not-allowed;
             color: #888;
-        }
-
-        #rtStatus {
-            font-size: 11px;
-            color: #667788;
-            text-align: center;
-            margin-top: 8px;
-            min-height: 20px;
-        }
-
-        /* 色条 */
-        #colorbar-container {
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        #colorbar-canvas {
-            flex: 1;
-            height: 14px;
-            border-radius: 3px;
-            border: 1px solid rgba(68,136,170,0.3);
-        }
-        .cb-label {
-            color: #88bbdd;
-            font-size: 10px;
-            font-weight: 600;
-            min-width: 30px;
-            text-align: center;
         }
 
         /* 加载动画 */
@@ -283,7 +254,7 @@
 
             <div class="panel-section">
                 <div class="section-title">📊 历史记忆参数（可选）</div>
-                <div style="font-size:10px; color:#667788; margin-bottom:8px;">留空则使用当前参数值作为默认值</div>
+                <div style="font-size:10px; color:#667788; margin-bottom:5px;">留空则使用当前参数值</div>
                 <div class="param-grid">
                     <div class="param-item">
                         <label>Dst lag-1h</label>
@@ -314,18 +285,7 @@
             </div>
 
             <div class="panel-section">
-                <div class="section-title">🎨 色标</div>
-                <div id="colorbar-container">
-                    <span class="cb-label">0</span>
-                    <canvas id="colorbarCanvas"></canvas>
-                    <span class="cb-label">100</span>
-                </div>
-                <div style="text-align:center;color:#667788;font-size:10px;margin-top:4px;">TEC (TECU)</div>
-            </div>
-
-            <div class="panel-section">
-                <button class="btn-primary" id="btnLoadRT">🔄 加载实时 TEC</button>
-                <div id="rtStatus"></div>
+                <button class="btn-primary" id="btnLoadRT">计算TEC</button>
             </div>
         </div>
     </div>
@@ -366,34 +326,10 @@
         canvas.width = W;
         canvas.height = H;
 
-        const cbCanvas = document.getElementById('colorbarCanvas');
-        const cbCtx = cbCanvas.getContext('2d');
-        cbCanvas.width = 400;
-        cbCanvas.height = 20;
-
-        // ====================== 色条渲染 ======================
-        function renderColorbar() {
-            const w = cbCanvas.width, h = cbCanvas.height;
-            const data = cbCtx.createImageData(w, h);
-            for (let x = 0; x < w; x++) {
-                const t = x / w;
-                let r, g, b;
-                if (t < 0.125)      { r = 0;   g = 0;   b = 0.5 + t * 4; }
-                else if (t < 0.375) { r = 0;   g = (t - 0.125) * 4; b = 1; }
-                else if (t < 0.625) { r = (t - 0.375) * 4; g = 1; b = 1 - (t - 0.375) * 4; }
-                else if (t < 0.875) { r = 1;   g = 1 - (t - 0.625) * 4; b = 0; }
-                else                { r = 1 - (t - 0.875) * 2; g = 0;   b = 0; }
-                for (let y = 0; y < h; y++) {
-                    const idx = (y * w + x) * 4;
-                    data[idx]     = Math.floor(r * 255);
-                    data[idx + 1] = Math.floor(g * 255);
-                    data[idx + 2] = Math.floor(b * 255);
-                    data[idx + 3] = 255;
-                }
-            }
-            cbCtx.putImageData(data, 0, 0);
-        }
-        renderColorbar();
+        // 地图内边距（经纬度标签显示在边距区域，右侧预留垂直色条）
+        const MAP_MARGIN = { left: 35, right: 39, top: 15, bottom: 18 };
+        const MAP_W = W - MAP_MARGIN.left - MAP_MARGIN.right;
+        const MAP_H = H - MAP_MARGIN.top - MAP_MARGIN.bottom;
 
         // ====================== 时间更新（北京时间直接作为模型输入） ======================
         function updateRTTime() {
@@ -415,67 +351,71 @@
 
         // ====================== 绘制网格 ======================
         function drawGrid() {
+            // 经纬度 → 内矩形像素坐标
+            function lonToX(lon) { return MAP_MARGIN.left + ((lon + 180) / 360) * MAP_W; }
+            function latToY(lat) { return MAP_MARGIN.top + ((90 - lat) / 180) * MAP_H; }
+
             ctx.strokeStyle = 'rgba(136,187,221,0.2)';
             ctx.lineWidth = 0.5;
 
             // 经线（每30度）
             for (let lon = -180; lon <= 180; lon += 30) {
-                const x = ((lon + 180) / 360) * W;
+                const x = lonToX(lon);
                 ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, H);
+                ctx.moveTo(x, MAP_MARGIN.top);
+                ctx.lineTo(x, MAP_MARGIN.top + MAP_H);
                 ctx.stroke();
             }
 
             // 纬线（每30度）
             for (let lat = -90; lat <= 90; lat += 30) {
-                const y = ((90 - lat) / 180) * H;
+                const y = latToY(lat);
                 ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(W, y);
+                ctx.moveTo(MAP_MARGIN.left, y);
+                ctx.lineTo(MAP_MARGIN.left + MAP_W, y);
                 ctx.stroke();
             }
 
             // 赤道高亮
             ctx.strokeStyle = 'rgba(136,187,221,0.4)';
             ctx.lineWidth = 1;
-            const eqY = H / 2;
+            const eqY = latToY(0);
             ctx.beginPath();
-            ctx.moveTo(0, eqY);
-            ctx.lineTo(W, eqY);
+            ctx.moveTo(MAP_MARGIN.left, eqY);
+            ctx.lineTo(MAP_MARGIN.left + MAP_W, eqY);
             ctx.stroke();
 
-            // 经纬度标签
-            ctx.fillStyle = 'rgba(136,187,221,0.5)';
+            // ===== 经纬度标签（显示在地图边距区域） =====
+            ctx.fillStyle = 'rgba(136,187,221,0.6)';
             ctx.font = '9px monospace';
+
+            // 经度标签（底部）
             ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
             for (let lon = -180; lon < 180; lon += 60) {
-                const x = ((lon + 180) / 360) * W;
-                ctx.fillText(lon + '°', x, H - 4);
+                const x = lonToX(lon);
+                ctx.fillText(lon + '°', x, MAP_MARGIN.top + MAP_H + 3);
             }
+
+            // 纬度标签（左侧）
             ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
             for (let lat = -60; lat <= 60; lat += 30) {
-                const y = ((90 - lat) / 180) * H;
-                ctx.fillText(lat + '°', 36, y + 3);
+                const y = latToY(lat);
+                ctx.fillText(lat + '°', MAP_MARGIN.left - 5, y);
             }
         }
 
         // ====================== 加载并渲染 TEC ======================
         async function loadRealtimeTEC() {
             const btn = document.getElementById('btnLoadRT');
-            const status = document.getElementById('rtStatus');
-
             btn.disabled = true;
-            btn.textContent = '⏳ 加载中...';
-            status.textContent = '正在调用 TEC 预测引擎...';
-            status.style.color = '#88bbdd';
+            btn.textContent = '⏳ 计算中...';
 
             try {
                 if (!tecEngineReady) {
-                    status.textContent = '⚠️ TEC 引擎正在初始化，请稍后...';
-                    status.style.color = '#ffaa00';
                     btn.disabled = false;
-                    btn.textContent = '🔄 加载实时 TEC';
+                    btn.textContent = '计算TEC';
                     return;
                 }
 
@@ -494,9 +434,6 @@
                     if (val !== '') memoryLags.dst[lag] = parseFloat(val);
                 });
 
-                status.textContent = `⏳ 预测中 (DOY ${doy}, UT ${ut_hour}:00)...`;
-                status.style.color = '#88bbdd';
-
                 const geojson = await tecEngine.predict({
                     year, doy, ut_hour,
                     drivers: { f107, f107a, dst, ap, kp },
@@ -506,16 +443,12 @@
                 // 渲染
                 renderTECMap(geojson);
 
-                status.textContent = `✅ 已加载 (DOY ${doy}, UT ${ut_hour}:00)`;
-                status.style.color = '#88ddff';
-                console.log('[RT TEC] 实时TEC加载完成');
+                console.log('[RT TEC] TEC计算完成');
             } catch (e) {
-                console.error('[RT TEC] 加载失败:', e);
-                status.textContent = '❌ 加载失败: ' + (e.message || '未知错误');
-                status.style.color = '#ff6666';
+                console.error('[RT TEC] 计算失败:', e);
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🔄 加载实时 TEC';
+                btn.textContent = '计算TEC';
             }
         }
 
@@ -537,7 +470,7 @@
             const lonArr = [...lons].sort((a, b) => a - b);
 
             if (latArr.length < 2 || lonArr.length < 2) {
-                document.getElementById('rtStatus').textContent = '⚠️ 数据不足以渲染';
+                console.warn('[TEC] 数据不足以渲染');
                 return;
             }
 
@@ -560,27 +493,31 @@
                        e01 * tx * (1 - ty) + e11 * tx * ty;
             }
 
-            // 第一步：画地球背景
+            // 第一步：画地球背景（裁剪到地图内矩形区域）
             ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = '#0a0a2e';
+            ctx.fillRect(0, 0, W, H);
             if (earthImgLoaded || earthImg.complete) {
-                ctx.drawImage(earthImg, 0, 0, W, H);
-            } else {
-                ctx.fillStyle = '#0a0a2e';
-                ctx.fillRect(0, 0, W, H);
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(MAP_MARGIN.left, MAP_MARGIN.top, MAP_W, MAP_H);
+                ctx.clip();
+                ctx.drawImage(earthImg, MAP_MARGIN.left, MAP_MARGIN.top, MAP_W, MAP_H);
+                ctx.restore();
             }
 
-            // 第二步：离屏 canvas 渲染不透明热力图
+            // 第二步：离屏 canvas（地图尺寸）渲染不透明热力图
             const offCanvas = document.createElement('canvas');
-            offCanvas.width = W;
-            offCanvas.height = H;
+            offCanvas.width = MAP_W;
+            offCanvas.height = MAP_H;
             const offCtx = offCanvas.getContext('2d');
-            const imageData = offCtx.createImageData(W, H);
+            const imageData = offCtx.createImageData(MAP_W, MAP_H);
             const pixels = imageData.data;
 
-            for (let py = 0; py < H; py++) {
-                const lat = 90 - (py / H) * 180;
-                for (let px = 0; px < W; px++) {
-                    const lon = (px / W) * 360 - 180;
+            for (let py = 0; py < MAP_H; py++) {
+                const lat = 90 - (py / MAP_H) * 180;
+                for (let px = 0; px < MAP_W; px++) {
+                    const lon = (px / MAP_W) * 360 - 180;
                     const tec = interpolateTec(lat, lon);
                     const t = Math.min(Math.max(tec / 100, 0), 1);
                     let r, g, b;
@@ -589,7 +526,7 @@
                     else if (t < 0.625)  { r = (t - 0.375) * 4; g = 1; b = 1 - (t - 0.375) * 4; }
                     else if (t < 0.875)  { r = 1;   g = 1 - (t - 0.625) * 4; b = 0; }
                     else                 { r = 1 - (t - 0.875) * 2; g = 0;   b = 0; }
-                    const idx = (py * W + px) * 4;
+                    const idx = (py * MAP_W + px) * 4;
                     pixels[idx]     = Math.floor(r * 255);
                     pixels[idx + 1] = Math.floor(g * 255);
                     pixels[idx + 2] = Math.floor(b * 255);
@@ -598,14 +535,63 @@
             }
             offCtx.putImageData(imageData, 0, 0);
 
-            // 第三步：半透明合成到主画布
+            // 第三步：半透明合成到主画布的地图区域
             ctx.save();
             ctx.globalAlpha = 0.45;
-            ctx.drawImage(offCanvas, 0, 0);
+            ctx.drawImage(offCanvas, MAP_MARGIN.left, MAP_MARGIN.top);
             ctx.restore();
 
             // 第四步：绘制网格和标签（不透明）
             drawGrid();
+
+            // 第五步：右侧垂直 TECU 色条
+            drawVerticalColorbar();
+        }
+
+        // ====================== 垂直 TECU 色条 ======================
+        function drawVerticalColorbar() {
+            const cbLeft = MAP_MARGIN.left + MAP_W + 5;  // 色条左侧 X
+            const cbTop = MAP_MARGIN.top;
+            const cbW = 14, cbH = MAP_H;
+
+            // 色条背景边框
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(cbLeft - 1, cbTop - 1, cbW + 2, cbH + 2);
+            ctx.strokeStyle = 'rgba(68,136,170,0.4)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cbLeft - 1, cbTop - 1, cbW + 2, cbH + 2);
+
+            // 绘制渐变色条（从下到上，0→100 TECU）
+            for (let py = 0; py < cbH; py++) {
+                const t = 1 - py / cbH;  // 底部 t=0，顶部 t=1
+                let r, g, b;
+                if (t < 0.125)      { r = 0;   g = 0;   b = 0.5 + t * 4; }
+                else if (t < 0.375) { r = 0;   g = (t - 0.125) * 4; b = 1; }
+                else if (t < 0.625) { r = (t - 0.375) * 4; g = 1; b = 1 - (t - 0.375) * 4; }
+                else if (t < 0.875) { r = 1;   g = 1 - (t - 0.625) * 4; b = 0; }
+                else                { r = 1 - (t - 0.875) * 2; g = 0;   b = 0; }
+                ctx.fillStyle = `rgb(${Math.floor(r*255)},${Math.floor(g*255)},${Math.floor(b*255)})`;
+                ctx.fillRect(cbLeft, cbTop + py, cbW, 1);
+            }
+
+            // TECU 刻度标签（右侧）
+            ctx.fillStyle = 'rgba(136,187,221,0.6)';
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            const tecValues = [0, 20, 40, 60, 80, 100];
+            for (const v of tecValues) {
+                const t = v / 100;
+                const y = cbTop + cbH * (1 - t);
+                ctx.fillText(v, cbLeft + cbW + 4, y);
+            }
+
+            // "TECU" 标签在色条顶部
+            ctx.fillStyle = 'rgba(136,187,221,0.5)';
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('TECU', cbLeft + cbW / 2, cbTop - 3);
         }
 
         // ====================== 事件绑定 ======================

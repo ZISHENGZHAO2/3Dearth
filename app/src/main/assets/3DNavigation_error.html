@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D 导航误差热力图</title>
 
+    <!-- 预加载 TEC 计算页面资源，加速页面切换 -->
+    <link rel="prefetch" href="tec_realtime.html">
+    <link rel="prefetch" href="tec-engine.js">
+    <link rel="prefetch" href="tec_trees.json">
+    <link rel="prefetch" href="eof_maps.json">
+    <link rel="prefetch" href="tec_mean.json">
+
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
@@ -2749,6 +2756,15 @@
             }
             updateSunPosition();
             animate();
+
+            // 后台预加载 TEC 引擎资源，加速 TEC 计算页面的首次加载
+            setTimeout(() => {
+                const tecAssets = ['tec-engine.js', 'tec_trees.json', 'eof_maps.json', 'tec_mean.json'];
+                for (const url of tecAssets) {
+                    fetch(url).then(r => { if (!r.ok) console.warn('[Prefetch] 预加载失败:', url); }).catch(() => {});
+                }
+                console.log('[Prefetch] TEC 引擎资源已在后台预加载');
+            }, 5000); // 延迟5秒，等页面核心渲染完成后再预取
         });
 
     </script>
