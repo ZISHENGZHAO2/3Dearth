@@ -440,8 +440,8 @@
                     memory_lags: memoryLags,
                 });
 
-                // 渲染
-                renderTECMap(geojson);
+                // 渲染（传入时间用于绘制晨昏线）
+                renderTECMap(geojson, doy, ut_hour);
 
                 console.log('[RT TEC] TEC计算完成');
             } catch (e) {
@@ -453,7 +453,7 @@
         }
 
         // ====================== 渲染 TEC 热力图 ======================
-        function renderTECMap(geojson) {
+        function renderTECMap(geojson, doy, utHour) {
             // 解析数据到网格
             const tecGrid = {};
             const lats = new Set(), lons = new Set();
@@ -541,10 +541,16 @@
             ctx.drawImage(offCanvas, MAP_MARGIN.left, MAP_MARGIN.top);
             ctx.restore();
 
-            // 第四步：绘制网格和标签（不透明）
+            // 第四步：绘制夜间阴影区
+            drawNightShadow(doy, utHour);
+
+            // 第五步：绘制网格和标签（不透明）
             drawGrid();
 
-            // 第五步：右侧垂直 TECU 色条
+            // 第六步：绘制晨昏线
+            drawTerminator(doy, utHour);
+
+            // 第七步：右侧垂直 TECU 色条
             drawVerticalColorbar();
         }
 
@@ -592,6 +598,128 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
             ctx.fillText('TECU', cbLeft + cbW / 2, cbTop - 3);
+        }
+
+        // ====================== 夜间阴影 ======================
+        function drawNightShadow(doy, utHour) {
+            // 太阳赤纬
+            const declination = 23.44 * Math.sin(2 * Math.PI / 365 * (doy - 81));
+            const decRad = declination * Math.PI / 180;
+            // 太阳直射点子午线经度
+            const subsolarLon = (12 - utHour) / 24 * 360;
+            const subsolarLonRad = subsolarLon * Math.PI / 180;
+
+            // 离屏 canvas（地图尺寸）绘制阴影
+            const shadowCanvas = document.createElement('canvas');
+            shadowCanvas.width = MAP_W;
+            shadowCanvas.height = MAP_H;
+            const shadowCtx = shadowCanvas.getContext('2d');
+            const imageData = shadowCtx.createImageData(MAP_W, MAP_H);
+            const pixels = imageData.data;
+
+            for (let py = 0; py < MAP_H; py++) {
+                const lat = 90 - (py / MAP_H) * 180;
+                const latRad = lat * Math.PI / 180;
+                for (let px = 0; px < MAP_W; px++) {
+                    const lon = (px / MAP_W) * 360 - 180;
+                    const lonRad = lon * Math.PI / 180;
+
+                    // 太阳天顶角余弦
+                    const cosZenith = Math.sin(latRad) * Math.sin(decRad) +
+                                      Math.cos(latRad) * Math.cos(decRad) *
+                                      Math.cos(lonRad - subsolarLonRad);
+
+                    const idx = (py * MAP_W + px) * 4;
+                    if (cosZenith < 0) {
+                        // 夜间：半透明深色
+                        pixels[idx]     = 5;
+                        pixels[idx + 1] = 5;
+                        pixels[idx + 2] = 30;
+                        pixels[idx + 3] = 150;
+                    } else {
+                        pixels[idx]     = 0;
+                        pixels[idx + 1] = 0;
+                        pixels[idx + 2] = 0;
+                        pixels[idx + 3] = 0;
+                    }
+                }
+            }
+            shadowCtx.putImageData(imageData, 0, 0);
+
+            // 合成到主画布
+            ctx.drawImage(shadowCanvas, MAP_MARGIN.left, MAP_MARGIN.top);
+        }
+
+        // ====================== 晨昏线 ======================
+        function drawTerminator(doy, utHour) {
+            // 太阳赤纬
+            const declination = 23.44 * Math.sin(2 * Math.PI / 365 * (doy - 81));
+            const decRad = declination * Math.PI / 180;
+            const tanDec = Math.tan(decRad);
+
+            // 太阳直射点子午线经度：UT 12:00 时直射点在 0° 经度
+            const subsolarLon = (12 - utHour) / 24 * 360;
+
+            ctx.strokeStyle = 'rgba(255, 200, 50, 0.7)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+
+            // 处理春秋分（赤纬接近 0°）的特殊情况
+            const isEquinox = Math.abs(tanDec) < 1e-8;
+
+            if (isEquinox) {
+                // 春秋分：晨昏线为两条经线（直射点 ±90°）
+                const lon1 = ((subsolarLon + 90 + 180) % 360) - 180;
+                const x1 = MAP_MARGIN.left + ((lon1 + 180) / 360) * MAP_W;
+                ctx.beginPath();
+                ctx.moveTo(x1, MAP_MARGIN.top);
+                ctx.lineTo(x1, MAP_MARGIN.top + MAP_H);
+                ctx.stroke();
+
+                const lon2 = ((subsolarLon - 90 + 180) % 360) - 180;
+                const x2 = MAP_MARGIN.left + ((lon2 + 180) / 360) * MAP_W;
+                ctx.beginPath();
+                ctx.moveTo(x2, MAP_MARGIN.top);
+                ctx.lineTo(x2, MAP_MARGIN.top + MAP_H);
+                ctx.stroke();
+            } else {
+                // 一般情况：逐像素计算晨昏线纬度
+                ctx.beginPath();
+                let started = false;
+                for (let px = 0; px <= MAP_W; px++) {
+                    const lon = (px / MAP_W) * 360 - 180;
+                    const lonRad = lon * Math.PI / 180;
+                    const cosDLon = Math.cos(lonRad - subsolarLon * Math.PI / 180);
+
+                    let lat = Math.atan(-cosDLon / tanDec) * 180 / Math.PI;
+                    // 裁剪到有效范围
+                    lat = Math.max(-90, Math.min(90, lat));
+
+                    const cx = MAP_MARGIN.left + px;
+                    const cy = MAP_MARGIN.top + ((90 - lat) / 180) * MAP_H;
+
+                    if (cy >= MAP_MARGIN.top - 2 && cy <= MAP_MARGIN.top + MAP_H + 2) {
+                        if (!started) {
+                            ctx.moveTo(cx, cy);
+                            started = true;
+                        } else {
+                            ctx.lineTo(cx, cy);
+                        }
+                    } else {
+                        started = false;
+                    }
+                }
+                ctx.stroke();
+            }
+
+            ctx.setLineDash([]);
+
+            // 图例文字
+            ctx.fillStyle = 'rgba(255, 200, 50, 0.6)';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText('─ 晨昏线', MAP_MARGIN.left + 6, MAP_MARGIN.top + 6);
         }
 
         // ====================== 事件绑定 ======================
