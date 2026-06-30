@@ -509,7 +509,7 @@
         // 理想曲线（红色实线）：恒定初始高度
         const idealAlt = h_km[0];
         ctx.strokeStyle = '#ff4466';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
         const idealX0 = padding.left;
         const idealY0 = padding.top + (1 - (idealAlt - yMin) / yRange) * plotH;
@@ -621,6 +621,9 @@
 
     // 轨道计算按钮
     document.getElementById('btnCalc').addEventListener('click', runSimulation);
+
+    // 页面加载完成后自动执行一次计算
+    setTimeout(() => { runSimulation(); }, 100);
 
     // ====================== 北京时间时钟 ======================
     function updateBeijingClock() {

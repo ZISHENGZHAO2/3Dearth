@@ -596,6 +596,7 @@
                         <button id="btnCloud" class="toggle-btn">开启云层</button>
                         <button id="btnOrbitScale" class="toggle-btn">LEO 正常视图</button>
                         <button id="btnCameraOrbit" class="toggle-btn">相机环绕</button>
+                        <button id="btnFastForward" class="toggle-btn">快进</button>
                     </div>
                     <button id="controlsToggle" title="展开/收起工具箱"><span class="ctrl-label">工具</span><span class="ctrl-arrow">◀</span></button>
                 </div>
@@ -1491,18 +1492,8 @@
             gridGroup.visible = isGridVisible;
         });
 
-        // 相机环绕功能
-        let cameraOrbitMode = 0; // 0: 停止, 1: 一档(60秒), 2: 二档(30秒)
-        let cameraOrbitAngle = 0;
-        const cameraOrbitRadius = 3;  // 相机到地球的距离
-        const cameraOrbitHeight = 1.5; // 相机高度
-
-        // 速度档位: 每秒转动的角度（弧度）
-        const orbitSpeeds = [
-            0,                          // 0档: 停止
-            (2 * Math.PI) / 60,        // 1档: 60秒一圈
-            (2 * Math.PI) / 30         // 2档: 30秒一圈
-        ];
+        // 相机环绕功能（使用 OrbitControls 的 autoRotate）
+        let cameraOrbitMode = 0; // 0: 停止, 1: 慢速(60秒), 2: 快速(30秒)
 
         const orbitModeTexts = [
             '相机环绕',        // 0档
@@ -1517,19 +1508,62 @@
 
             btn.textContent = orbitModeTexts[cameraOrbitMode];
 
-            if (cameraOrbitMode > 0) {
+            switch (cameraOrbitMode) {
+                case 1: // 慢速：60秒一圈
+                    controls.autoRotate = true;
+                    controls.autoRotateSpeed = 1.0;
+                    btn.classList.add('active');
+                    break;
+                case 2: // 快速：30秒一圈
+                    controls.autoRotate = true;
+                    controls.autoRotateSpeed = 2.0;
+                    btn.classList.add('active');
+                    break;
+                default: // 停止
+                    controls.autoRotate = false;
+                    btn.classList.remove('active');
+                    break;
+            }
+        });
+
+        // 快进功能：模拟时间加速
+        let ffMultiplier = 1;          // 1=正常, 10, 60, 600
+        let ffStartRealTime = Date.now();
+        let ffStartSimTime = Date.now();
+
+        function getSimulatedTime() {
+            return new Date(ffStartSimTime + (Date.now() - ffStartRealTime) * ffMultiplier);
+        }
+
+        function setFFMultiplier(mult) {
+            // 切换前先计算当前模拟时间，保证连续
+            const currentSim = ffStartSimTime + (Date.now() - ffStartRealTime) * ffMultiplier;
+            ffStartSimTime = currentSim;
+            ffStartRealTime = Date.now();
+            ffMultiplier = mult;
+        }
+
+        const ffModeTexts = ['快进', '快进×10', '快进×60', '快进×600'];
+        const ffMultipliers = [1, 10, 60, 600];
+        let ffMode = 0;
+
+        document.getElementById('btnFastForward').addEventListener('click', () => {
+            ffMode = (ffMode + 1) % 4;
+            const btn = document.getElementById('btnFastForward');
+            btn.textContent = ffModeTexts[ffMode];
+            if (ffMode > 0) {
                 btn.classList.add('active');
-                // 计算当前相机角度
-                cameraOrbitAngle = Math.atan2(camera.position.z, camera.position.x);
+                setFFMultiplier(ffMultipliers[ffMode]);
             } else {
                 btn.classList.remove('active');
+                setFFMultiplier(1);
             }
         });
 
         // ====================== 真实时间与地球自转 ======================
-        // 计算太阳位置（基于真实时间）
+        // 计算太阳位置（基于模拟时间）
         function updateSunPosition() {
-            const now = new Date();
+            const now = getSimulatedTime();
             // 北京时间（本地时间）
             const localHours = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
             // UTC = 北京时间 - 8
@@ -2051,7 +2085,7 @@
                 localStorage.removeItem('tec_display_satellites');
                 return;
             }
-            const now = new Date();
+            const now = getSimulatedTime();
             const gmst = satellite.gstime(now);
             const list = [];
             for (const satId of _displayList) {
@@ -2248,7 +2282,7 @@
 
         // 绘制选中卫星的轨道线
         function drawSatOrbit(satrec) {
-            const now = new Date();
+            const now = getSimulatedTime();
             const meanMotion = satrec.no_kozai || satrec.no;
             const periodMin = meanMotion ? (2 * Math.PI) / meanMotion : 90;
             const periodMs = periodMin * 60 * 1000;
@@ -2711,23 +2745,13 @@
                 // 更新太阳位置 + 地球旋转（每帧从真实 UTC 时间计算，重启不丢失）
             updateSunPosition();
 
-            // 相机环绕
-            if (cameraOrbitMode > 0) {
-                cameraOrbitAngle += orbitSpeeds[cameraOrbitMode] * frameDeltaTime;
-
-                // 计算相机位置（圆形轨道）
-                camera.position.x = cameraOrbitRadius * Math.cos(cameraOrbitAngle);
-                camera.position.z = cameraOrbitRadius * Math.sin(cameraOrbitAngle);
-                camera.position.y = cameraOrbitHeight;
-            }
-
             // 卫星轨道动画（DEMO 示例卫星）
             updateSatellitePosition();
 
             // 降低更新频率：每 3 帧更新一次所有卫星位置（减轻低端 GPU 负载）
             _frameCount++;
             if (_frameCount % 3 === 0) {
-                updateAllSatPositions(new Date());
+                updateAllSatPositions(getSimulatedTime());
             }
             // 每 180 帧（约 3 秒）保存显示列表卫星位置到 localStorage，供 TEC 热力图使用
             if (_listMode && _frameCount % 180 === 0) {
@@ -2737,7 +2761,7 @@
             // 更新高亮精灵位置 + 呼吸闪烁
             if (selectedSats.size > 0) {
                 const breath = 0.08 + 0.06 * (0.5 + 0.5 * Math.sin(currentTime / 400));
-                const now = new Date();
+                const now = getSimulatedTime();
                 const gmst = satellite.gstime(now);
                 for (const [, sel] of selectedSats) {
                     if (sel.sprite && sel.satrec) {
@@ -2756,6 +2780,17 @@
                         }
                     }
                     if (sel.orbitLine) sel.orbitLine.rotation.y = earth.rotation.y;
+                }
+                // 每 60 帧刷新一次轨道线，使轨道预测随模拟时间更新
+                if (_frameCount % 60 === 0) {
+                    for (const [, sel] of selectedSats) {
+                        if (sel.orbitLine && sel.satrec) {
+                            scene.remove(sel.orbitLine);
+                            sel.orbitLine.geometry.dispose();
+                            sel.orbitLine.material.dispose();
+                            sel.orbitLine = drawSatOrbit(sel.satrec);
+                        }
+                    }
                 }
             }
 

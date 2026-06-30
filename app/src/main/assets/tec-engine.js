@@ -278,9 +278,72 @@
     "glotec_data.geojson": "getGlotecData",
   };
 
+  // ========================================================
+  // IndexedDB 缓存层：首次加载后缓存解析好的模型数据，
+  // 后续页面切换无需重新 fetch 和 JSON.parse（约 31 MB）
+  // ========================================================
+  var DB_NAME = "TecEngineCache";
+  var DB_VERSION = 2;
+  var STORE_NAME = "parsedData";
+  var CACHE_KEY_PREFIX = "tec_";
+  var CACHE_VERSION = 2; // 模型文件更新时递增，使旧缓存失效
+
+  function openDB() {
+    return new Promise(function (resolve, reject) {
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function (e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = function (e) { resolve(e.target.result); };
+      req.onerror = function (e) { reject(e.target.error); };
+    });
+  }
+
+  function getFromCache(filename) {
+    var key = CACHE_KEY_PREFIX + filename;
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(STORE_NAME, "readonly");
+        var store = tx.objectStore(STORE_NAME);
+        var req = store.get(key);
+        req.onsuccess = function () {
+          var entry = req.result;
+          if (entry && entry._cacheVersion === CACHE_VERSION) {
+            console.log("[TEC Engine] Cache HIT for " + filename);
+            resolve(entry.data);
+          } else {
+            if (entry) console.log("[TEC Engine] Cache stale for " + filename + ", refetching");
+            resolve(null);
+          }
+        };
+        req.onerror = function () { resolve(null); };
+      });
+    }).catch(function () { return null; });
+  }
+
+  function putInCache(filename, data) {
+    var key = CACHE_KEY_PREFIX + filename;
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(STORE_NAME, "readwrite");
+        var store = tx.objectStore(STORE_NAME);
+        store.put({ data: data, _cacheVersion: CACHE_VERSION }, key);
+        tx.oncomplete = function () {
+          console.log("[TEC Engine] Cached " + filename + " in IndexedDB");
+          resolve();
+        };
+        tx.onerror = function () { resolve(); }; // 缓存失败不影响主流程
+      });
+    }).catch(function () { /* ignore */ });
+  }
+
   /**
    * Load JSON data with multiple fallback strategies:
-   * 1. AndroidBridge - native preloaded data (fastest, Android only)
+   * 0. IndexedDB cache (fastest, persists across page loads)
+   * 1. AndroidBridge - native preloaded data (fast, Android only)
    * 2. fetch() - works in browsers and modern WebViews
    * 3. XMLHttpRequest - fallback for file:// URLs
    */
@@ -288,13 +351,23 @@
     var filename = url.split("/").pop();
     var bridgeMethod = BRIDGE_MAP[filename];
 
+    // Strategy 0: IndexedDB cache
+    return getFromCache(filename).then(function (cached) {
+      if (cached) return cached;
+      return fetchFromNetwork(url, filename, bridgeMethod);
+    });
+  }
+
+  function fetchFromNetwork(url, filename, bridgeMethod) {
     // Strategy 1: AndroidBridge (if available, skip network requests)
     if (bridgeMethod && window.AndroidBridge && typeof AndroidBridge[bridgeMethod] === "function") {
       try {
         var raw = AndroidBridge[bridgeMethod]();
         if (raw) {
           console.log("[TEC Engine] Loaded " + filename + " via AndroidBridge");
-          return Promise.resolve(JSON.parse(raw));
+          var data = JSON.parse(raw);
+          putInCache(filename, data);
+          return Promise.resolve(data);
         }
       } catch (e) {
         console.warn("[TEC Engine] AndroidBridge failed for " + filename + ", trying fetch");
@@ -307,6 +380,10 @@
         if (!resp.ok) throw new Error("HTTP " + resp.status);
         return resp.json();
       })
+      .then(function (data) {
+        putInCache(filename, data);
+        return data;
+      })
       .catch(function () {
         // Strategy 3: XMLHttpRequest
         return new Promise(function (resolve, reject) {
@@ -316,7 +393,9 @@
           xhr.onload = function () {
             if (xhr.status === 200 || xhr.status === 0) {
               try {
-                resolve(xhr.response || JSON.parse(xhr.responseText));
+                var data = xhr.response || JSON.parse(xhr.responseText);
+                putInCache(filename, data);
+                resolve(data);
               } catch (e) {
                 reject(e);
               }
