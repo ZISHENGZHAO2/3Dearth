@@ -446,6 +446,38 @@
         const MAP_W = W - MAP_MARGIN.left - MAP_MARGIN.right;
         const MAP_H = H - MAP_MARGIN.top - MAP_MARGIN.bottom;
 
+        // 经纬度映射工具
+        function wrapLongitude(lon) {
+            return ((lon + 180) % 360 + 360) % 360 - 180;
+        }
+        function normalizeLongitudeToPrev(lon, prevLon) {
+            if (typeof prevLon !== 'number') return lon;
+            let delta = lon - prevLon;
+            while (delta > 180) {
+                lon -= 360;
+                delta = lon - prevLon;
+            }
+            while (delta < -180) {
+                lon += 360;
+                delta = lon - prevLon;
+            }
+            return lon;
+        }
+        function lonToX(lon) {
+            const wrappedLon = wrapLongitude(lon);
+            return MAP_MARGIN.left + ((wrappedLon + 180) / 360) * MAP_W;
+        }
+        function latToY(lat) {
+            return MAP_MARGIN.top + ((90 - lat) / 180) * MAP_H;
+        }
+        function forEachWrappedX(lon, callback) {
+            const x = lonToX(lon);
+            const rightEdge = MAP_MARGIN.left + MAP_W;
+            callback(x);
+            if (x - MAP_MARGIN.left < 15) callback(x + MAP_W);
+            if (rightEdge - x < 15) callback(x - MAP_W);
+        }
+
         // ====================== 时间更新（北京时间直接作为模型输入） ======================
         function updateRTTime() {
             const now = new Date();
@@ -466,10 +498,6 @@
 
         // ====================== 绘制网格 ======================
         function drawGrid() {
-            // 经纬度 → 内矩形像素坐标
-            function lonToX(lon) { return MAP_MARGIN.left + ((lon + 180) / 360) * MAP_W; }
-            function latToY(lat) { return MAP_MARGIN.top + ((90 - lat) / 180) * MAP_H; }
-
             ctx.strokeStyle = 'rgba(136,187,221,0.2)';
             ctx.lineWidth = 0.5;
 
@@ -575,6 +603,10 @@
         // 卫星轨迹预测缓存: satPredictedFrames[i] = [sat1, sat2, ...] 与 playbackFrames[i] 对应
         let satPredictedFrames = [];
         let satTleCache = null; // 当前播放使用的卫星TLE数据
+        // 轨迹连续经度缓存，避免跨经线时突然跳转到反向位置
+        const lastLonBySat = new Map();
+        // 绘制时的上一帧经度缓存，用于刷新及预测绘制间的平滑显示
+        const lastDrawnLonBySat = new Map();
 
         /**
          * 从 localStorage 读取显示列表卫星，如果包含 TLE 则创建 satrec 并计算未来位置
@@ -602,6 +634,7 @@
             }
 
             // 创建 satrec 对象
+            lastLonBySat.clear();
             const satrecs = [];
             for (const s of satWithTle) {
                 try {
@@ -618,31 +651,38 @@
 
             // 对每个时间步计算卫星位置
             for (const step of timeSteps) {
-                // 构建 Date 对象（UTC 时间）
-                // step.utHour 是小数小时（如 6.1667 = 6:10），需拆分为时和分
-                const utcHourInt = Math.floor(step.utHour);
-                const utcMinInt = Math.round((step.utHour - utcHourInt) * 60);
-                const utcDate = new Date(Date.UTC(step.year, 0, step.doy, utcHourInt, utcMinInt, 0));
-                const gmst = satellite.gstime(utcDate);
                 const frameSats = [];
+                try {
+                    const utcDate = (typeof step.utcMs === 'number')
+                        ? new Date(step.utcMs)
+                        : new Date(Date.UTC(step.year, 0, step.doy, step.bjHour, step.bjMin, 0) - 8 * 3600000);
+                    const gmst = satellite.gstime(utcDate);
 
-                for (const satrec of satrecs) {
-                    try {
-                        const pv = satellite.propagate(satrec, utcDate);
-                        if (!pv.position) continue;
-                        const gd = satellite.eciToGeodetic(pv.position, gmst);
-                        const lat = parseFloat((gd.latitude * 180 / Math.PI).toFixed(4));
-                        const lon = parseFloat((gd.longitude * 180 / Math.PI).toFixed(4));
-                        frameSats.push({
-                            id: satrec._id,
-                            name: satrec._name,
-                            lat, lon,
-                            constellation: satrec._constellation,
-                            color: satrec._color
-                        });
-                    } catch (e) {
-                        // 传播失败，跳过
+                    for (const satrec of satrecs) {
+                        try {
+                            const pv = satellite.propagate(satrec, utcDate);
+                            if (!pv.position) continue;
+                            const gd = satellite.eciToGeodetic(pv.position, gmst);
+                            const lat = parseFloat((gd.latitude * 180 / Math.PI).toFixed(4));
+                            let lon = parseFloat((gd.longitude * 180 / Math.PI).toFixed(4));
+                            const prevLon = lastLonBySat.get(satrec._id);
+                            lon = normalizeLongitudeToPrev(lon, prevLon);
+                            lastLonBySat.set(satrec._id, lon);
+                            frameSats.push({
+                                id: satrec._id,
+                                name: satrec._name,
+                                lat, lon,
+                                constellation: satrec._constellation,
+                                color: satrec._color
+                            });
+                        } catch (e) {
+                            // 传播失败，跳过此卫星
+                            console.warn('[sat] 传播失败', satrec._name, e);
+                        }
                     }
+                } catch (e) {
+                    // 整帧计算失败，保留空帧
+                    console.error('[sat] 整帧计算失败', e);
                 }
 
                 frames.push(frameSats);
@@ -699,38 +739,36 @@
                 // 读取步长选择
                 const activeStep = document.querySelector('.step-opt.active');
                 const stepHours = parseFloat(activeStep ? activeStep.dataset.step : '1');
-                const totalFrames = Math.round(24 / stepHours);
+                const stepMinutes = Math.round(stepHours * 60);
+                const stepMs = stepMinutes * 60000;
+                const totalFrames = Math.round(24 * 60 / stepMinutes);
 
                 // 计算当前北京时间
                 const now = new Date();
                 const bjMs = now.getTime() + 8 * 3600000;
-                const bj = new Date(bjMs);
-                let baseBJDoy = Math.floor((bjMs - Date.UTC(bj.getUTCFullYear(), 0, 0)) / 86400000);
-                const baseBJYear = bj.getUTCFullYear();
-                const baseBJHour = bj.getUTCHours();
-                const baseBJMin = bj.getUTCMinutes();
+                const baseBJDate = new Date(bjMs);
+                const baseUTDate = new Date(bjMs - 8 * 3600000);
 
                 // 预计算
                 playbackFrames = [];
                 playbackTimes = [];
 
                 for (let i = 0; i < totalFrames; i++) {
-                    // 当前步的累计小时数
-                    const hoursOffset = i * stepHours;
-                    const totalBJHours = baseBJHour + baseBJMin / 60 + hoursOffset;
-                    const bjHourInt = Math.floor(totalBJHours) % 24;
-                    const bjMin = Math.round((totalBJHours - Math.floor(totalBJHours)) * 60);
-                    const doyOffset = Math.floor((baseBJHour + hoursOffset) / 24);
-                    let doy = baseBJDoy + doyOffset;
-                    let year = baseBJYear;
-                    // 跨年处理
-                    const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
-                    if (doy > daysInYear) { doy -= daysInYear; year++; }
+                    const currentBJMs = baseBJDate.getTime() + i * stepMs;
+                    const currentUTMs = baseUTDate.getTime() + i * stepMs;
+                    const currentBJDate = new Date(currentBJMs);
+                    const currentUTDate = new Date(currentUTMs);
+
+                    const year = currentBJDate.getUTCFullYear();
+                    const startOfYear = Date.UTC(year, 0, 0);
+                    const doy = Math.floor((currentBJMs - startOfYear) / 86400000);
+                    const bjHourInt = currentBJDate.getUTCHours();
+                    const bjMin = currentBJDate.getUTCMinutes();
 
                     // UTC 时（北京-8），取整小时供模型使用
-                    const utHour = (bjHourInt - 8 + 24) % 24;
+                    const utHour = currentUTDate.getUTCHours();
                     // 渲染用的精细 UT 时（含分钟）
-                    const utHourFrac = utHour + bjMin / 60;
+                    const utHourFrac = utHour + currentUTDate.getUTCMinutes() / 60 + currentUTDate.getUTCSeconds() / 3600;
 
                     statusText.textContent = `⏳ 预计算中 ${i + 1}/${totalFrames}...`;
                     fillBar.style.width = `${((i + 1) / totalFrames) * 100}%`;
@@ -742,7 +780,7 @@
                     });
 
                     playbackFrames.push(geojson);
-                    playbackTimes.push({ year, doy, utHour: utHourFrac, bjHour: bjHourInt, bjMin });
+                    playbackTimes.push({ year, doy, utHour: utHourFrac, bjHour: bjHourInt, bjMin, utcMs: currentUTMs });
                 }
 
                 // 预计算卫星轨迹（与 TEC 时间步对齐）
@@ -954,56 +992,54 @@
             } catch (e) { return; }
             if (!Array.isArray(data) || data.length === 0) return;
 
-            function lonToX(lon) { return MAP_MARGIN.left + ((lon + 180) / 360) * MAP_W; }
-            function latToY(lat) { return MAP_MARGIN.top + ((90 - lat) / 180) * MAP_H; }
-
             for (const sat of data) {
-                const x = lonToX(sat.lon);
                 const y = latToY(sat.lat);
-                // 跳过超出地图区域的标记
-                if (x < MAP_MARGIN.left || x > MAP_MARGIN.left + MAP_W ||
-                    y < MAP_MARGIN.top || y > MAP_MARGIN.top + MAP_H) continue;
+                if (y < MAP_MARGIN.top || y > MAP_MARGIN.top + MAP_H) continue;
 
-                // 外发光圈
-                const grad = markerCtx.createRadialGradient(x, y, 0, x, y, 8);
-                grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-                grad.addColorStop(0.3, 'rgba(255,220,80,0.6)');
-                grad.addColorStop(1, 'rgba(255,220,80,0)');
-                markerCtx.fillStyle = grad;
-                markerCtx.beginPath();
-                markerCtx.arc(x, y, 8, 0, Math.PI * 2);
-                markerCtx.fill();
+                forEachWrappedX(sat.lon, x => {
+                    if (x < MAP_MARGIN.left || x > MAP_MARGIN.left + MAP_W) return;
 
-                // 🛰️ 图标（居中在卫星位置）
-                markerCtx.font = '14px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
-                markerCtx.textAlign = 'center';
-                markerCtx.textBaseline = 'middle';
-                markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
-                markerCtx.shadowBlur = 4;
-                markerCtx.fillText('🛰️', x + 1, y - 1);
-                markerCtx.shadowBlur = 0;
+                    // 外发光圈
+                    const grad = markerCtx.createRadialGradient(x, y, 0, x, y, 8);
+                    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+                    grad.addColorStop(0.3, 'rgba(255,220,80,0.6)');
+                    grad.addColorStop(1, 'rgba(255,220,80,0)');
+                    markerCtx.fillStyle = grad;
+                    markerCtx.beginPath();
+                    markerCtx.arc(x, y, 8, 0, Math.PI * 2);
+                    markerCtx.fill();
 
-                // 卫星名称标签
-                markerCtx.fillStyle = 'rgba(255,255,255,0.95)';
-                markerCtx.font = '11px "Segoe UI", sans-serif';
-                markerCtx.textAlign = 'left';
-                markerCtx.textBaseline = 'bottom';
-                markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
-                markerCtx.shadowBlur = 4;
-                markerCtx.fillText(sat.name, x + 6, y - 3);
-                markerCtx.shadowBlur = 0;
-
-                // 星座名称小标签
-                if (sat.constellation) {
-                    markerCtx.fillStyle = 'rgba(136,187,221,0.65)';
-                    markerCtx.font = '9px monospace';
-                    markerCtx.textAlign = 'left';
-                    markerCtx.textBaseline = 'top';
+                    // 🛰️ 图标（居中在卫星位置）
+                    markerCtx.font = '14px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+                    markerCtx.textAlign = 'center';
+                    markerCtx.textBaseline = 'middle';
                     markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
                     markerCtx.shadowBlur = 4;
-                    markerCtx.fillText(sat.constellation, x + 6, y + 3);
+                    markerCtx.fillText('🛰️', x + 1, y - 1);
                     markerCtx.shadowBlur = 0;
-                }
+
+                    // 卫星名称标签
+                    markerCtx.fillStyle = 'rgba(255,255,255,0.95)';
+                    markerCtx.font = '11px "Segoe UI", sans-serif';
+                    markerCtx.textAlign = 'left';
+                    markerCtx.textBaseline = 'bottom';
+                    markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
+                    markerCtx.shadowBlur = 4;
+                    markerCtx.fillText(sat.name, x + 6, y - 3);
+                    markerCtx.shadowBlur = 0;
+
+                    // 星座名称小标签
+                    if (sat.constellation) {
+                        markerCtx.fillStyle = 'rgba(136,187,221,0.65)';
+                        markerCtx.font = '9px monospace';
+                        markerCtx.textAlign = 'left';
+                        markerCtx.textBaseline = 'top';
+                        markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
+                        markerCtx.shadowBlur = 4;
+                        markerCtx.fillText(sat.constellation, x + 6, y + 3);
+                        markerCtx.shadowBlur = 0;
+                    }
+                });
             }
         }
 
@@ -1015,58 +1051,70 @@
             // 清空叠加层
             markerCtx.clearRect(0, 0, W, H);
 
-            if (!Array.isArray(sats) || sats.length === 0) return;
-
-            function lonToX(lon) { return MAP_MARGIN.left + ((lon + 180) / 360) * MAP_W; }
-            function latToY(lat) { return MAP_MARGIN.top + ((90 - lat) / 180) * MAP_H; }
+            // 回退机制：当前帧为空时，回退到最后一帧有数据的帧
+            if (!Array.isArray(sats) || sats.length === 0) {
+                if (playbackTimer && satPredictedFrames.length > 0 && playbackIndex > 0) {
+                    for (let fi = playbackIndex - 1; fi >= 0; fi--) {
+                        const frame = satPredictedFrames[fi];
+                        if (frame && frame.length > 0) {
+                            sats = frame;
+                            break;
+                        }
+                    }
+                }
+                if (!Array.isArray(sats) || sats.length === 0) return;
+            }
 
             // 用轨迹尾部绘制预测路径尾迹（最近几帧已绘制的点）
             for (const sat of sats) {
-                const x = lonToX(sat.lon);
+                if (typeof sat.lat !== 'number' || typeof sat.lon !== 'number' || isNaN(sat.lat) || isNaN(sat.lon)) continue;
                 const y = latToY(sat.lat);
-                if (x < MAP_MARGIN.left || x > MAP_MARGIN.left + MAP_W ||
-                    y < MAP_MARGIN.top || y > MAP_MARGIN.top + MAP_H) continue;
+                if (y < MAP_MARGIN.top || y > MAP_MARGIN.top + MAP_H) continue;
 
-                // 轨迹预测样式：半透明青色外发光（区别于实时标记的黄色）
-                const grad = markerCtx.createRadialGradient(x, y, 0, x, y, 10);
-                grad.addColorStop(0, 'rgba(255,255,255,0.95)');
-                grad.addColorStop(0.3, 'rgba(80,220,255,0.7)');
-                grad.addColorStop(1, 'rgba(80,220,255,0)');
-                markerCtx.fillStyle = grad;
-                markerCtx.beginPath();
-                markerCtx.arc(x, y, 10, 0, Math.PI * 2);
-                markerCtx.fill();
+                forEachWrappedX(sat.lon, x => {
+                    if (x < MAP_MARGIN.left || x > MAP_MARGIN.left + MAP_W) return;
 
-                // 🛰️ 图标
-                markerCtx.font = '14px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
-                markerCtx.textAlign = 'center';
-                markerCtx.textBaseline = 'middle';
-                markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
-                markerCtx.shadowBlur = 4;
-                markerCtx.fillText('🛰️', x + 1, y - 1);
-                markerCtx.shadowBlur = 0;
+                    // 轨迹预测样式：半透明青色外发光（区别于实时标记的黄色）
+                    const grad = markerCtx.createRadialGradient(x, y, 0, x, y, 10);
+                    grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+                    grad.addColorStop(0.3, 'rgba(80,220,255,0.7)');
+                    grad.addColorStop(1, 'rgba(80,220,255,0)');
+                    markerCtx.fillStyle = grad;
+                    markerCtx.beginPath();
+                    markerCtx.arc(x, y, 10, 0, Math.PI * 2);
+                    markerCtx.fill();
 
-                // 卫星名称
-                markerCtx.fillStyle = 'rgba(255,255,255,0.95)';
-                markerCtx.font = '11px "Segoe UI", sans-serif';
-                markerCtx.textAlign = 'left';
-                markerCtx.textBaseline = 'bottom';
-                markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
-                markerCtx.shadowBlur = 4;
-                markerCtx.fillText(sat.name, x + 6, y - 3);
-                markerCtx.shadowBlur = 0;
-
-                // 星座名称
-                if (sat.constellation) {
-                    markerCtx.fillStyle = 'rgba(80,220,255,0.65)';
-                    markerCtx.font = '9px monospace';
-                    markerCtx.textAlign = 'left';
-                    markerCtx.textBaseline = 'top';
+                    // 🛰️ 图标
+                    markerCtx.font = '14px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+                    markerCtx.textAlign = 'center';
+                    markerCtx.textBaseline = 'middle';
                     markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
                     markerCtx.shadowBlur = 4;
-                    markerCtx.fillText(sat.constellation, x + 6, y + 3);
+                    markerCtx.fillText('🛰️', x + 1, y - 1);
                     markerCtx.shadowBlur = 0;
-                }
+
+                    // 卫星名称
+                    markerCtx.fillStyle = 'rgba(255,255,255,0.95)';
+                    markerCtx.font = '11px "Segoe UI", sans-serif';
+                    markerCtx.textAlign = 'left';
+                    markerCtx.textBaseline = 'bottom';
+                    markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
+                    markerCtx.shadowBlur = 4;
+                    markerCtx.fillText(sat.name, x + 6, y - 3);
+                    markerCtx.shadowBlur = 0;
+
+                    // 星座名称
+                    if (sat.constellation) {
+                        markerCtx.fillStyle = 'rgba(80,220,255,0.65)';
+                        markerCtx.font = '9px monospace';
+                        markerCtx.textAlign = 'left';
+                        markerCtx.textBaseline = 'top';
+                        markerCtx.shadowColor = 'rgba(0,0,0,0.85)';
+                        markerCtx.shadowBlur = 4;
+                        markerCtx.fillText(sat.constellation, x + 6, y + 3);
+                        markerCtx.shadowBlur = 0;
+                    }
+                });
             }
 
             // 如果正在播放，绘制尾迹（使用历史帧位置）
@@ -1077,21 +1125,24 @@
                     if (!frame) continue;
                     const alpha = 0.1 + 0.5 * (fi - trailStart) / (playbackIndex - trailStart);
                     for (const sat of frame) {
-                        const x = lonToX(sat.lon);
                         const y = latToY(sat.lat);
-                        if (x < MAP_MARGIN.left || x > MAP_MARGIN.left + MAP_W ||
-                            y < MAP_MARGIN.top || y > MAP_MARGIN.top + MAP_H) continue;
-                        markerCtx.fillStyle = `rgba(80, 220, 255, ${alpha * 0.3})`;
-                        markerCtx.beginPath();
-                        markerCtx.arc(x, y, 3, 0, Math.PI * 2);
-                        markerCtx.fill();
+                        if (y < MAP_MARGIN.top || y > MAP_MARGIN.top + MAP_H) continue;
+                        forEachWrappedX(sat.lon, x => {
+                            if (x < MAP_MARGIN.left || x > MAP_MARGIN.left + MAP_W) return;
+                            markerCtx.fillStyle = `rgba(80, 220, 255, ${alpha * 0.3})`;
+                            markerCtx.beginPath();
+                            markerCtx.arc(x, y, 3, 0, Math.PI * 2);
+                            markerCtx.fill();
+                        });
                     }
                 }
             }
         }
 
-        // 每 3 秒自动刷新卫星标记（从 localStorage 读取最新位置）
-        setInterval(refreshSatelliteMarkers, 3000);
+        // 每 3 秒自动刷新卫星标记（从 localStorage 读取最新位置），播放中跳过
+        setInterval(() => {
+            if (!playbackTimer) refreshSatelliteMarkers();
+        }, 3000);
 
         // ====================== 垂直 TECU 色条 ======================
         function drawVerticalColorbar() {
