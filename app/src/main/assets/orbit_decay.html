@@ -278,11 +278,16 @@
             </div>
             <div style="margin-top:10px;">
                 <button class="btn-primary" id="btnCalc">🛰️ 轨道计算</button>
+                <button class="btn-primary" id="btnLoopTest" style="margin-top:4px; background: linear-gradient(135deg, #7744bb, #5522aa);">🔄 循环测试 (100次)</button>
             </div>
             <div id="resultDisplay" style="margin-top:10px; font-size:11px; color:#88aacc; line-height:1.8;">
                 <div><span style="color:#aaccee;">轨道高度：</span><span id="rdInit">--</span></div>
-                <div><span style="color:#aaccee;">5年后高度：</span><span id="rd5y">--</span><span style="color:#667788;">（下降 <span id="rdDrop">--</span>）</span></div>
-                <div><span style="color:#aaccee;">收起太阳翼高度：</span><span id="rdFolded">--</span><span style="color:#667788;">（下降 <span id="rdDropFolded">--</span>）</span></div>
+                <div><span style="color:#aaccee;">5年后高度：</span><span id="rd5y">--</span><span style="color:#667788;">（下降 <span id="rdDrop">--</span> km）</span></div>
+                <div><span style="color:#aaccee;">收起太阳翼高度：</span><span id="rdFolded">--</span><span style="color:#667788;">（下降 <span id="rdDropFolded">--</span> km）</span></div>
+                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(68,136,170,0.15);">
+                    <span style="color:#aaccee;">⏱️ 计算耗时：</span><span id="perfTime">--</span>
+                </div>
+                <div id="perfLoopResult" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(68,136,170,0.15);"></div>
             </div>
         </div>
 
@@ -586,11 +591,76 @@
     function runSimulation() {
         const p = readParams();
         if (p.h0 < 100 || p.h0 > 2000 || p.inc < 0 || p.inc > 180 || p.mass < 1 || p.mass > 10000) return;
+
+        const tCalcStart = performance.now();
         // 正常衰减
         simData = calculateOrbitDecay(p.h0, p.mass, p.Cd, p.Ad, p.As, p.Ps, p.inc, p.years);
         // 太阳翼收拢：迎风面积降80%，光压面积降95%
         simDataFolded = calculateOrbitDecay(p.h0, p.mass, p.Cd, p.Ad * 0.2, p.As * 0.05, p.Ps, p.inc, p.years);
+        const calcMs = performance.now() - tCalcStart;
+
+        const tRenderStart = performance.now();
         redrawChart();
+        const renderMs = performance.now() - tRenderStart;
+
+        document.getElementById('perfTime').textContent = `计算 ${calcMs.toFixed(2)}ms | 渲染 ${renderMs.toFixed(2)}ms`;
+        console.log('[Performance] 轨道衰减:', `calc=${calcMs.toFixed(2)}ms`, `render=${renderMs.toFixed(2)}ms`);
+    }
+
+    function loopTestOrbit() {
+        const btn = document.getElementById('btnLoopTest');
+        const N = 10000;
+        const loopResult = document.getElementById('perfLoopResult');
+        btn.disabled = true;
+        btn.textContent = '⏳ 循环测试中...';
+
+        const p = readParams();
+        if (p.h0 < 100 || p.h0 > 2000 || p.inc < 0 || p.inc > 180 || p.mass < 1 || p.mass > 10000) {
+            btn.disabled = false;
+            btn.textContent = '🔄 循环测试 (10000次)';
+            return;
+        }
+
+        const times = [];
+        const tTotalStart = performance.now();
+
+        for (let i = 0; i < N; i++) {
+            const t0 = performance.now();
+            // 计算两种曲线（正常+收拢）
+            calculateOrbitDecay(p.h0, p.mass, p.Cd, p.Ad, p.As, p.Ps, p.inc, p.years);
+            calculateOrbitDecay(p.h0, p.mass, p.Cd, p.Ad * 0.2, p.As * 0.05, p.Ps, p.inc, p.years);
+            times.push(performance.now() - t0);
+
+            if (i % 10 === 9) {
+                loopResult.textContent = '⏳ ' + (i + 1) + '/' + N + '...';
+            }
+        }
+
+        const tTotalEnd = performance.now();
+        const totalMs = tTotalEnd - tTotalStart;
+        const avgMs = times.reduce((a, b) => a + b, 0) / N;
+        const minMs = Math.min(...times);
+        const maxMs = Math.max(...times);
+        times.sort((a, b) => a - b);
+        const p50 = times[Math.floor(N * 0.5)];
+        const p95 = times[Math.floor(N * 0.95)];
+        const p99 = times[Math.floor(N * 0.99)];
+
+        loopResult.innerHTML = '🔄 ' + N + '次循环 (含2条曲线):<br>'
+            + '平均: <b>' + avgMs.toFixed(2) + ' ms</b><br>'
+            + 'P50: ' + p50.toFixed(2) + 'ms | P95: ' + p95.toFixed(2) + 'ms | P99: ' + p99.toFixed(2) + 'ms<br>'
+            + '最小: ' + minMs.toFixed(2) + 'ms | 最大: ' + maxMs.toFixed(2) + 'ms<br>'
+            + '总耗时: ' + totalMs.toFixed(0) + 'ms';
+
+        console.log('[LoopTest] Orbit', N + '次',
+            'avg=' + avgMs.toFixed(2) + 'ms',
+            'p50=' + p50.toFixed(2) + 'ms',
+            'p95=' + p95.toFixed(2) + 'ms',
+            'p99=' + p99.toFixed(2) + 'ms',
+            'total=' + totalMs.toFixed(0) + 'ms');
+
+        btn.disabled = false;
+        btn.textContent = '🔄 循环测试 (10000次)';
     }
 
     function redrawChart() {
@@ -621,6 +691,7 @@
 
     // 轨道计算按钮
     document.getElementById('btnCalc').addEventListener('click', runSimulation);
+    document.getElementById('btnLoopTest').addEventListener('click', loopTestOrbit);
 
     // 页面加载完成后自动执行一次计算
     setTimeout(() => { runSimulation(); }, 100);
