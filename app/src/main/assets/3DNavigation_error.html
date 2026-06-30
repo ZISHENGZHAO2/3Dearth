@@ -1944,7 +1944,7 @@
                     satrec._satId = nextId; // 标记唯一 ID
                     if (cfg) {
                         cfg.satrecs.push(satrec);
-                        satMap.set(nextId, { cfg, localIdx: cfg.satrecs.length - 1, name: nameLine });
+                        satMap.set(nextId, { cfg, localIdx: cfg.satrecs.length - 1, name: nameLine, tle1: line1, tle2: line2 });
                         nextId++;
                     }
                 } catch(_) {}
@@ -2045,6 +2045,44 @@
             }
         }
 
+        /** 将显示列表中的卫星经纬度保存到 localStorage，供 TEC 热力图页面使用 */
+        function saveDisplayListToStorage() {
+            if (_displayList.size === 0) {
+                localStorage.removeItem('tec_display_satellites');
+                return;
+            }
+            const now = new Date();
+            const gmst = satellite.gstime(now);
+            const list = [];
+            for (const satId of _displayList) {
+                const entry = _satMap ? _satMap.get(satId) : null;
+                if (!entry) continue;
+                const { cfg, localIdx } = entry;
+                if (localIdx < 0 || localIdx >= cfg.satrecs.length) continue;
+                const satrec = cfg.satrecs[localIdx];
+                const pv = satellite.propagate(satrec, now);
+                if (!pv.position) continue;
+                const gd = satellite.eciToGeodetic(pv.position, gmst);
+                const lat = gd.latitude * 180 / Math.PI;
+                const lon = gd.longitude * 180 / Math.PI;
+                list.push({
+                    id: satId,
+                    name: (satrec.name || 'UNKNOWN').trim(),
+                    lat: parseFloat(lat.toFixed(4)),
+                    lon: parseFloat(lon.toFixed(4)),
+                    constellation: cfg.label,
+                    color: cfg.color,
+                    tle1: entry.tle1 || '',
+                    tle2: entry.tle2 || ''
+                });
+            }
+            try {
+                localStorage.setItem('tec_display_satellites', JSON.stringify(list));
+            } catch (e) {
+                // localStorage 满时静默失败
+            }
+        }
+
         // ---------- 6. 构建星座选择面板 UI ----------
         function buildConstPanel(cfgs) {
             const panel = document.getElementById('const-panel');
@@ -2069,6 +2107,7 @@
                     _listMode = false;
                     _displayList.clear();
                     syncDisplayList();
+                    saveDisplayListToStorage();
                     updateDisplayListBtns();
                     // 显示所有轨道线和光晕
                     for (const [, sel] of selectedSats) {
@@ -2088,6 +2127,7 @@
                         if (cfg._pointsObj) cfg._pointsObj.visible = true;
                     }
                     syncDisplayList();
+                    saveDisplayListToStorage();
                     updateDisplayListBtns();
                     // 隐藏所有轨道线和光晕（列表模式由用户控制）
                     for (const [, sel] of selectedSats) {
@@ -2488,6 +2528,7 @@
                             }
                         }
                         syncDisplayList();
+                        saveDisplayListToStorage();
                         updateDisplayListBtns();
                     }
                 });
@@ -2687,6 +2728,10 @@
             _frameCount++;
             if (_frameCount % 3 === 0) {
                 updateAllSatPositions(new Date());
+            }
+            // 每 180 帧（约 3 秒）保存显示列表卫星位置到 localStorage，供 TEC 热力图使用
+            if (_listMode && _frameCount % 180 === 0) {
+                saveDisplayListToStorage();
             }
 
             // 更新高亮精灵位置 + 呼吸闪烁
