@@ -194,6 +194,43 @@
         }
         .btn-primary:hover { background: linear-gradient(135deg, #0088ff, #0066cc); }
 
+        .btn-add {
+            width: 100%;
+            padding: 8px;
+            background: linear-gradient(135deg, #008844, #006633);
+            border: none;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+        }
+        .btn-add:hover { background: linear-gradient(135deg, #00aa55, #008844); }
+
+        .custom-sat-item {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(68,170,68,0.2);
+            border-radius: 4px;
+            padding: 6px 8px;
+            margin-top: 4px;
+            font-size: 11px;
+            color: #88cc88;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .custom-sat-item .del-btn {
+            background: rgba(255,60,60,0.2);
+            border: 1px solid rgba(255,60,60,0.4);
+            color: #ff6666;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .custom-sat-item .del-btn:hover { background: rgba(255,60,60,0.4); }
+
         
     </style>
 </head>
@@ -278,6 +315,22 @@
             </div>
         </div>
 
+        <!-- 自定义卫星 -->
+        <div class="panel-section">
+            <div class="section-title">🔧 自定义卫星</div>
+            <div style="margin-bottom:8px;">
+                <div class="param-item" style="margin-bottom:6px;">
+                    <label>卫星名称</label>
+                    <input id="custName" type="text" placeholder="输入自定义卫星名称" style="text-align:left;">
+                </div>
+                <div style="color:#667788;font-size:9px;margin-bottom:6px;">使用上方参数框中的高度、倾角、质量等参数</div>
+                <button class="btn-add" id="btnAddCustom">➕ 添加自定义卫星</button>
+            </div>
+            <div id="customSatList" style="max-height:200px;overflow-y:auto;">
+                <!-- 已添加的自定义卫星列表 -->
+            </div>
+        </div>
+
 <script src="satellite.min.js"></script>
 <script>
     // ====================== 物理常量 ======================
@@ -339,6 +392,67 @@
     // 当前选中的卫星 ID（用于参数覆盖），null = 未选中
     let selectedSatId = null;
 
+    // 自定义卫星列表
+    let customSatellites = []; // [{name, altitude, inclination, mass, Cd, Ad, As, Ps}, ...]
+    let customIdCounter = 0;
+
+    function addCustomSatellite() {
+        const nameInput = document.getElementById('custName');
+        const name = (nameInput.value || '').trim();
+        if (!name) {
+            nameInput.style.borderColor = '#ff4444';
+            setTimeout(() => { nameInput.style.borderColor = ''; }, 1500);
+            return;
+        }
+        const p = readParams();
+        const h = parseFloat(document.getElementById('pHeight').value);
+        const inc = parseFloat(document.getElementById('pInclination').value);
+        customIdCounter++;
+        customSatellites.push({
+            name: name,
+            id: '__custom_' + customIdCounter,
+            altitude: h,
+            inclination: inc,
+            mass: p.mass,
+            Cd: p.Cd,
+            Ad: p.Ad,
+            As: p.As,
+            Ps: p.Ps
+        });
+        nameInput.value = '';
+        renderCustomSatList();
+        populateSatSelector();
+        runSimulation();
+    }
+
+    function removeCustomSatellite(customId) {
+        customSatellites = customSatellites.filter(s => s.id !== customId);
+        if (selectedSatId === customId) {
+            selectedSatId = null;
+            document.getElementById('pHeight').value = 300;
+            document.getElementById('pInclination').value = 45;
+        }
+        renderCustomSatList();
+        populateSatSelector();
+        runSimulation();
+    }
+
+    function renderCustomSatList() {
+        const container = document.getElementById('customSatList');
+        if (!container) return;
+        if (customSatellites.length === 0) {
+            container.innerHTML = '<div style="color:#445566;font-size:10px;text-align:center;padding:8px;">暂无自定义卫星</div>';
+            return;
+        }
+        container.innerHTML = customSatellites.map(s => {
+            const shortId = s.id.replace('__custom_', '');
+            return '<div class="custom-sat-item">' +
+                '<span>🔧 ' + s.name + ' <span style="color:#667788;">(' + Math.round(s.altitude) + 'km)</span></span>' +
+                '<button class="del-btn" onclick="removeCustomSatellite(\'' + s.id + '\')">✕ 删除</button>' +
+                '</div>';
+        }).join('');
+    }
+
     function loadDisplayListSatellites() {
         allSatellites = [];
         const countEl = document.getElementById('satCountDisplay');
@@ -387,7 +501,16 @@
             opt.textContent = '🛰️ ' + sat.name + (sat.constellation ? ' (' + sat.constellation + ')' : '');
             sel.appendChild(opt);
         }
-        selectedSatId = null;
+        for (const sat of customSatellites) {
+            const opt = document.createElement('option');
+            opt.value = sat.id;
+            opt.textContent = '🔧 ' + sat.name + ' (' + Math.round(sat.altitude) + 'km)';
+            sel.appendChild(opt);
+        }
+        // 恢复之前的选择
+        if (selectedSatId) {
+            sel.value = selectedSatId;
+        }
     }
 
     // 卫星选择变更：自动填充高度和倾角，用户可手动修改覆盖
@@ -399,7 +522,10 @@
             return;
         }
         selectedSatId = val;
-        const sat = allSatellites.find(s => String(s.id || s.name) === val);
+        // 先在 TLE 卫星列表中查找
+        let sat = allSatellites.find(s => String(s.id || s.name) === val);
+        // 再在自定义卫星列表中查找
+        if (!sat) sat = customSatellites.find(s => s.id === val);
         if (sat) {
             document.getElementById('pHeight').value = Math.round(sat.altitude);
             document.getElementById('pInclination').value = Math.round(sat.inclination);
@@ -643,19 +769,27 @@
 
     function runSimulation() {
         const p = readParams();
-        if (allSatellites.length === 0) {
+        const totalSatellites = allSatellites.length + customSatellites.length;
+        if (totalSatellites === 0) {
             drawAllCharts([], 5);
             return;
         }
         allSatResults = [];
-        for (let idx = 0; idx < allSatellites.length; idx++) {
-            const sat = allSatellites[idx];
+        // 合并 TLE 卫星和自定义卫星
+        const allSats = [];
+        for (const sat of allSatellites) {
+            allSats.push({ ...sat, isCustom: false });
+        }
+        for (const sat of customSatellites) {
+            allSats.push({ ...sat, isCustom: true });
+        }
+        for (let idx = 0; idx < allSats.length; idx++) {
+            const sat = allSats[idx];
             const color = SAT_COLORS[idx % SAT_COLORS.length];
-            // 如果选中了这颗卫星，使用输入框中的所有参数进行覆盖
             const satId = String(sat.id || sat.name);
             let h0, inc, mass, Cd, Ad, As, Ps;
             if (selectedSatId && selectedSatId === satId) {
-                // 选中卫星：使用输入框参数（全部覆盖）
+                // 选中卫星（TLE 或自定义）：使用输入框参数（全部覆盖）
                 h0 = parseFloat(document.getElementById('pHeight').value);
                 inc = parseFloat(document.getElementById('pInclination').value);
                 mass = p.mass;
@@ -663,6 +797,15 @@
                 Ad = p.Ad;
                 As = p.As;
                 Ps = p.Ps;
+            } else if (sat.isCustom) {
+                // 自定义卫星（未选中）：始终使用存储的参数
+                h0 = sat.altitude;
+                inc = sat.inclination;
+                mass = sat.mass;
+                Cd = sat.Cd;
+                Ad = sat.Ad;
+                As = sat.As;
+                Ps = sat.Ps;
             } else {
                 // 未选中本卫星（或未选中任何卫星）：使用 TLE 自带高度/倾角 + 默认参数
                 h0 = sat.altitude;
@@ -691,27 +834,57 @@
                 initAlt: h0
             });
         }
+        // 同步更新选中自定义卫星的存储参数
+        if (selectedSatId && selectedSatId.startsWith('__custom_')) {
+            const cust = customSatellites.find(s => s.id === selectedSatId);
+            if (cust) {
+                cust.altitude = parseFloat(document.getElementById('pHeight').value);
+                cust.inclination = parseFloat(document.getElementById('pInclination').value);
+                cust.mass = p.mass;
+                cust.Cd = p.Cd;
+                cust.Ad = p.Ad;
+                cust.As = p.As;
+                cust.Ps = p.Ps;
+                renderCustomSatList();
+                populateSatSelector();
+            }
+        }
         redrawChart();
     }
 
     function redrawChart() {
         drawAllCharts(allSatResults, 5);
-        // 更新结果显示：显示最高和最低的最终高度
-        if (allSatResults.length > 0) {
-            const initHs = allSatResults.map(r => r.initAlt);
-            const finalHs = allSatResults.map(r => r.h_km[r.h_km.length - 1]);
-            const maxInit = Math.max(...initHs);
-            const minFinal = Math.min(...finalHs);
-            document.getElementById('rdInit').textContent = maxInit.toFixed(1) + ' km（最高）';
-            document.getElementById('rd5y').textContent = minFinal.toFixed(1) + ' km（最低）';
-            document.getElementById('rdDrop').textContent = '多卫星（见曲线）';
-            document.getElementById('rdFolded').textContent = '—（多卫星）';
-            document.getElementById('rdDropFolded').textContent = '—';
+        if (selectedSatId && allSatResults.length > 0) {
+            const r = allSatResults.find(s => s.id === selectedSatId || String(s.id) === selectedSatId);
+            if (r) {
+                const h0 = r.initAlt;
+                const h5 = r.h_km[r.h_km.length - 1];
+                const drop = h0 - h5;
+                const h5f = r.hFolded_km ? r.hFolded_km[r.hFolded_km.length - 1] : null;
+                const dropF = h5f !== null ? (h0 - h5f) : null;
+                document.getElementById('rdInit').textContent = h0.toFixed(1) + ' km';
+                document.getElementById('rd5y').textContent = h5.toFixed(1) + ' km';
+                document.getElementById('rdDrop').textContent = drop.toFixed(1) + ' km';
+                document.getElementById('rdFolded').textContent = h5f !== null ? h5f.toFixed(1) + ' km' : '--';
+                document.getElementById('rdDropFolded').textContent = dropF !== null ? dropF.toFixed(1) + ' km' : '--';
+                return;
+            }
         }
+        document.getElementById('rdInit').textContent = '--';
+        document.getElementById('rd5y').textContent = '--';
+        document.getElementById('rdDrop').textContent = '--';
+        document.getElementById('rdFolded').textContent = '--';
+        document.getElementById('rdDropFolded').textContent = '--';
     }
 
     // 轨道计算按钮
     document.getElementById('btnCalc').addEventListener('click', runSimulation);
+
+    // 添加自定义卫星按钮
+    document.getElementById('btnAddCustom').addEventListener('click', addCustomSatellite);
+
+    // 初始渲染自定义卫星列表
+    renderCustomSatList();
 
     // 页面加载完成后自动执行一次计算
     setTimeout(() => { runSimulation(); }, 100);
