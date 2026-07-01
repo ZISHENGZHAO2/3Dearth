@@ -62,13 +62,20 @@
         /* 图表区域 */
         #chart-area {
             flex: 1;
-            padding: 16px;
+            padding: 8px;
             display: flex;
             background: rgba(2,6,18,0.95);
             overflow: hidden;
         }
-        #chart-single {
+        #charts-container {
             flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 10px;
+            overflow-y: auto;
+            align-content: start;
+        }
+        .chart-card {
             background: #080820;
             border: 1px solid rgba(68,136,170,0.25);
             border-radius: 6px;
@@ -76,42 +83,46 @@
             flex-direction: column;
             overflow: hidden;
             position: relative;
+            min-height: 200px;
         }
-        #chart-single .chart-title {
+        .chart-card .chart-card-title {
             color: #88aacc;
-            font-size: 13px;
-            padding: 8px 14px;
+            font-size: 12px;
+            padding: 5px 10px;
             border-bottom: 1px solid rgba(68,136,170,0.12);
             flex-shrink: 0;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        #chart-single .chart-legend {
+        .chart-card .chart-legend {
             position: absolute;
-            top: 8px;
-            right: 14px;
+            top: 5px;
+            right: 10px;
             display: flex;
-            gap: 16px;
+            gap: 10px;
             z-index: 2;
-            font-size: 11px;
+            font-size: 10px;
             font-family: 'Consolas', monospace;
         }
-        #chart-single .chart-legend .legend-item {
+        .chart-card .chart-legend .legend-item {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
-        #chart-single .chart-legend .legend-dot {
-            width: 10px;
-            height: 10px;
+        .chart-card .chart-legend .legend-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             display: inline-block;
         }
-        #chart-single .chart-canvas-wrap {
+        .chart-card .chart-card-canvas-wrap {
             flex: 1;
             position: relative;
             min-height: 0;
         }
-        #chart-single .chart-canvas-wrap canvas {
+        .chart-card .chart-card-canvas-wrap canvas {
             width: 100% !important;
             height: 100% !important;
             display: block;
@@ -138,20 +149,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* 卫星选择器 */
-        .sat-selector {
-            width: 100%;
-            padding: 6px 8px;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(68,136,170,0.4);
-            color: #ccddee;
-            font-size: 11px;
-            border-radius: 4px;
-            outline: none;
-            margin-bottom: 10px;
-        }
-        .sat-selector:focus { border-color: #88ccff; }
-        .sat-selector option { background: #0a1530; color: #ccddee; }
         /* 参数输入 */
         .param-grid {
             display: grid;
@@ -164,11 +161,7 @@
             border-radius: 6px;
             padding: 8px;
         }
-        .param-item.auto-filled {
-            border-color: rgba(68,200,255,0.4);
-            background: rgba(68,200,255,0.05);
-        }
-        .param-item label {
+        .param-item {
             display: block;
             color: #667788;
             font-size: 10px;
@@ -217,14 +210,8 @@
             <span class="nav-time" id="beijingClock">--:--:--</span>
         </div>
         <div id="chart-area">
-            <div id="chart-single">
-                <div class="chart-title">📈 轨道高度衰减曲线</div>
-                <div class="chart-legend">
-                    <span class="legend-item"><span class="legend-dot" style="background:#00aaff;"></span> 实际高度</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#ff4466;"></span> 理想高度</span>
-                    <span class="legend-item"><span class="legend-dot" style="background:#00ddcc;"></span> 太阳翼收拢</span>
-                </div>
-                <div class="chart-canvas-wrap"><canvas id="chMain"></canvas></div>
+            <div id="charts-container">
+                <!-- 由 JS 动态生成每颗卫星的图表卡片 -->
             </div>
         </div>
     </div>
@@ -234,10 +221,8 @@
         <!-- 卫星参数 -->
         <div class="panel-section">
             <div class="section-title">🛰️ 卫星参数</div>
-            <!-- 卫星选择器 -->
-            <select class="sat-selector" id="satSelector">
-                <option value="">-- 从显示列表选择卫星 --</option>
-            </select>
+            <!-- 卫星数量显示 -->
+            <div id="satCountDisplay" style="color:#88aacc; font-size:11px; margin-bottom:10px;">卫星列表：加载中...</div>
             
             <div class="param-grid">
                 <div class="param-item" id="piHeight">
@@ -294,6 +279,7 @@
     const M_EARTH = 5.972e24;
     const OMEGA_EARTH = 7.2921159e-5;
     const MU = 3.986004418e14; // 地球引力常数 m³/s²
+    const CHART_Y_MAX = 2200;  // 图表 Y 轴最大值 (km)
 
     function atmosphericDensity(h_km, F10_7 = 150, Ap = 10) {
         let H, rho0;
@@ -331,53 +317,52 @@
         }
     }
 
-    // ====================== 从显示列表自动填充 ======================
+    // ====================== 从显示列表读取卫星 ======================
+    // 存储所有卫星数据
+    let allSatellites = []; // [{name, tle1, tle2, altitude, inclination}, ...]
+    
+    // 多卫星颜色方案
+    const SAT_COLORS = [
+        '#00aaff', '#ff8844', '#44ff88', '#ff44aa',
+        '#ddcc00', '#8844ff', '#44ddff', '#ff6644',
+        '#aaff44', '#ff44dd', '#44ffcc', '#cc88ff',
+        '#ffaa44', '#66ffaa', '#ff88cc', '#88ccff'
+    ];
+
     function loadDisplayListSatellites() {
-        const selector = document.getElementById('satSelector');
-        // 保留第一个选项
-        selector.innerHTML = '<option value="">-- 从显示列表选择卫星 --</option>';
+        allSatellites = [];
+        const countEl = document.getElementById('satCountDisplay');
         try {
             const raw = localStorage.getItem('tec_display_satellites');
-            if (!raw) return;
+            if (!raw) {
+                countEl.textContent = '卫星列表：无数据';
+                return;
+            }
             const sats = JSON.parse(raw);
-            if (!Array.isArray(sats) || sats.length === 0) return;
+            if (!Array.isArray(sats) || sats.length === 0) {
+                countEl.textContent = '卫星列表：无数据';
+                return;
+            }
             for (const sat of sats) {
-                if (sat.tle1 && sat.tle2) {
-                    const opt = document.createElement('option');
-                    opt.value = sat.id || sat.name;
-                    opt.dataset.tle1 = sat.tle1;
-                    opt.dataset.tle2 = sat.tle2;
-                    opt.dataset.name = sat.name || 'Unknown';
-                    opt.textContent = '🛰️ ' + (sat.name || 'Unknown') + ' [' + (sat.constellation || '?') + ']';
-                    selector.appendChild(opt);
-                }
+                if (!sat.tle1 || !sat.tle2) continue;
+                const params = computeOrbitParamsFromTLE(sat.tle1, sat.tle2);
+                if (!params) continue;
+                allSatellites.push({
+                    name: sat.name || 'Unknown',
+                    id: sat.id || '',
+                    tle1: sat.tle1,
+                    tle2: sat.tle2,
+                    altitude: params.altitude,
+                    inclination: params.inclination,
+                    constellation: sat.constellation || ''
+                });
             }
-            // 自动选择第一个
-            if (selector.options.length > 1) {
-                selector.selectedIndex = 1;
-                selector.dispatchEvent(new Event('change'));
-            }
+            countEl.textContent = `卫星列表：${allSatellites.length} 颗卫星`;
         } catch (e) {
+            countEl.textContent = '读取失败';
             console.error('读取显示列表失败:', e);
         }
     }
-
-    document.getElementById('satSelector').addEventListener('change', function() {
-        const opt = this.options[this.selectedIndex];
-        if (!opt || !opt.value || !opt.dataset.tle1) {
-            document.getElementById('piHeight').classList.remove('auto-filled');
-            document.getElementById('piInclination').classList.remove('auto-filled');
-            return;
-        }
-        const params = computeOrbitParamsFromTLE(opt.dataset.tle1, opt.dataset.tle2);
-        if (!params) return;
-        // 填充参数
-        document.getElementById('pHeight').value = Math.round(params.altitude);
-        document.getElementById('pInclination').value = params.inclination.toFixed(1);
-        // 高亮已自动填充的字段
-        document.getElementById('piHeight').classList.add('auto-filled');
-        document.getElementById('piInclination').classList.add('auto-filled');
-    });
 
     // ====================== 轨道衰减计算 ======================
     function calculateOrbitDecay(h0_km, mass, Cd, A_drag, A_srp, P_SRP, incDeg, simYears) {
@@ -411,169 +396,200 @@
         return { h_m, inc, months };
     }
 
-    // ====================== 单图表绘制（固定轴：X=0~5年, Y=0~2200km） ======================
-    const CHART_Y_MAX = 2200; // km
-    const CHART_X_MAX = 5;    // 年
+    // ====================== 多卫星独立图表绘制 ======================
+    function drawAllCharts(results, simYears) {
+        const container = document.getElementById('charts-container');
+        if (!container) return;
+        container.innerHTML = '';
 
-    function initChart() {
-        const canvas = document.getElementById('chMain');
-        const wrap = canvas.parentElement;
-        canvas.width = wrap.clientWidth || 400;
-        canvas.height = wrap.clientHeight || 300;
+        if (!results || results.length === 0) {
+            container.style.display = 'flex';
+            container.style.alignItems = 'center';
+            container.style.justifyContent = 'center';
+            container.innerHTML = '<div style="color:#445566;font-size:14px;text-align:center;">等待卫星数据...</div>';
+            return;
+        }
+        container.style.display = 'grid';
+
+        const years = simYears || 5;
+        const yMin = 0, yMax = CHART_Y_MAX;
+        const yRange = yMax - yMin;
+
+        // 为每颗卫星创建一个图表卡片
+        for (let idx = 0; idx < results.length; idx++) {
+            const r = results[idx];
+            const card = document.createElement('div');
+            card.className = 'chart-card';
+
+            // 标题
+            const title = document.createElement('div');
+            title.className = 'chart-card-title';
+            title.textContent = '🛰️ ' + r.name;
+            card.appendChild(title);
+
+            // 图例
+            const legend = document.createElement('div');
+            legend.className = 'chart-legend';
+            legend.innerHTML =
+                '<span class="legend-item"><span class="legend-dot" style="background:' + r.color + ';"></span> 实际</span>' +
+                '<span class="legend-item"><span class="legend-dot" style="background:' + r.color + ';opacity:0.55;"></span> 收拢</span>';
+            card.appendChild(legend);
+
+            // Canvas 包装器
+            const wrap = document.createElement('div');
+            wrap.className = 'chart-card-canvas-wrap';
+            const canvas = document.createElement('canvas');
+            canvas.id = 'chSat_' + idx;
+            wrap.appendChild(canvas);
+            card.appendChild(wrap);
+
+            container.appendChild(card);
+        }
+
+        // 等待布局完成后绘制每张图表
+        requestAnimationFrame(function () {
+            for (let idx = 0; idx < results.length; idx++) {
+                drawSingleChart('chSat_' + idx, results[idx], years, yMin, yMax, yRange);
+            }
+        });
     }
 
-    function drawMainChart(h_km, simYears, hFolded_km) {
-        const canvas = document.getElementById('chMain');
+    function drawSingleChart(canvasId, satResult, years, yMin, yMax, yRange) {
+        const canvas = document.getElementById(canvasId);
         if (!canvas) return;
         const wrap = canvas.parentElement;
         const dpr = window.devicePixelRatio || 1;
-        const w = wrap.clientWidth || 400;
-        const h = wrap.clientHeight || 300;
+        const w = wrap.clientWidth || 300;
+        const h = wrap.clientHeight || 200;
         canvas.width = w * dpr;
         canvas.height = h * dpr;
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
-        ctx.fillStyle = '#080820';
-        ctx.fillRect(0, 0, w, h);
 
-        const padding = { top: 16, bottom: 32, left: 56, right: 20 };
+        const padding = { top: 10, bottom: 24, left: 44, right: 10 };
         const plotW = w - padding.left - padding.right;
         const plotH = h - padding.top - padding.bottom;
 
-        const N = h_km ? h_km.length : 0;
-        const years = simYears || 5;
+        // 背景
+        ctx.fillStyle = '#080820';
+        ctx.fillRect(0, 0, w, h);
 
-        // Y轴范围：0~2200 km
-        const yMin = 0, yMax = CHART_Y_MAX;
-        const yRange = yMax - yMin;
+        const N = satResult.h_km.length;
 
-        // 网格线
-        ctx.strokeStyle = 'rgba(68,136,170,0.12)';
+        // 网格
+        ctx.strokeStyle = 'rgba(68,136,170,0.10)';
         ctx.lineWidth = 0.5;
-        const yGridLines = CHART_Y_MAX / 200; // 每200km一条
+        const yGridLines = CHART_Y_MAX / 200;
         const xGridLines = years;
         for (let gi = 0; gi <= yGridLines; gi++) {
             const y = padding.top + (gi / yGridLines) * plotH;
-            ctx.beginPath();
-            ctx.moveTo(padding.left, y);
-            ctx.lineTo(padding.left + plotW, y);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(padding.left + plotW, y); ctx.stroke();
         }
         for (let gi = 0; gi <= xGridLines; gi++) {
             const x = padding.left + (gi / xGridLines) * plotW;
-            ctx.beginPath();
-            ctx.moveTo(x, padding.top);
-            ctx.lineTo(x, padding.top + plotH);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x, padding.top); ctx.lineTo(x, padding.top + plotH); ctx.stroke();
         }
 
-        // Y轴刻度（km）
+        // Y 轴刻度
         ctx.fillStyle = '#556677';
-        ctx.font = '10px Consolas, monospace';
+        ctx.font = '9px Consolas, monospace';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
         for (let gi = 0; gi <= yGridLines; gi++) {
             const y = padding.top + (gi / yGridLines) * plotH;
             const val = yMax - (gi / yGridLines) * yRange;
-            ctx.fillText(val + '', padding.left - 6, y);
+            ctx.fillText(val + '', padding.left - 4, y);
         }
-        // Y轴标签
+        // Y 轴标签
         ctx.save();
-        ctx.translate(10, padding.top + plotH / 2);
+        ctx.translate(8, padding.top + plotH / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#8899aa';
-        ctx.font = '11px sans-serif';
+        ctx.fillStyle = '#667788';
+        ctx.font = '9px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('轨道高度 (km)', 0, 0);
+        ctx.fillText('km', 0, 0);
         ctx.restore();
 
-        // X轴刻度（年）
+        // X 轴刻度
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         for (let gi = 0; gi <= xGridLines; gi++) {
             const x = padding.left + (gi / xGridLines) * plotW;
-            ctx.fillText(gi + '年', x, padding.top + plotH + 6);
+            ctx.fillText(gi + '年', x, padding.top + plotH + 4);
         }
 
-        // 无数据
-        if (!h_km || N < 2) {
-            ctx.fillStyle = '#445566';
-            ctx.font = '14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('等待卫星数据...', w / 2, h / 2);
-            return;
-        }
-
-        // 理想曲线（红色实线）：恒定初始高度
-        const idealAlt = h_km[0];
-        ctx.strokeStyle = '#ff4466';
-        ctx.lineWidth = 2.5;
+        // 理想高度线（虚线，匹配卫星颜色）
+        ctx.strokeStyle = satResult.color;
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
         ctx.beginPath();
-        const idealX0 = padding.left;
-        const idealY0 = padding.top + (1 - (idealAlt - yMin) / yRange) * plotH;
-        ctx.moveTo(idealX0, idealY0);
-        const idealX1 = padding.left + plotW;
-        ctx.lineTo(idealX1, idealY0);
+        const idY0 = padding.top + (1 - (satResult.initAlt - yMin) / yRange) * plotH;
+        ctx.moveTo(padding.left, idY0);
+        ctx.lineTo(padding.left + plotW, idY0);
         ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
 
-        // 实际衰减曲线（蓝色）
-        ctx.strokeStyle = '#00aaff';
-        ctx.lineWidth = 2;
+        // 实际衰减曲线（实线）
+        ctx.strokeStyle = satResult.color;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         let hasDrawn = false;
         for (let i = 0; i < N; i++) {
-            if (!isFinite(h_km[i])) continue;
+            if (!isFinite(satResult.h_km[i])) continue;
             const x = padding.left + (i / (N - 1)) * plotW;
-            const y = padding.top + (1 - (h_km[i] - yMin) / yRange) * plotH;
+            const y = padding.top + (1 - (satResult.h_km[i] - yMin) / yRange) * plotH;
             if (!hasDrawn) { ctx.moveTo(x, y); hasDrawn = true; }
             else ctx.lineTo(x, y);
         }
         ctx.stroke();
 
-        // 太阳翼收拢曲线（青色）
-        if (hFolded_km && hFolded_km.length >= 2) {
-            ctx.strokeStyle = '#00ddcc';
-            ctx.lineWidth = 2;
+        // 太阳翼收拢曲线（虚线）
+        if (satResult.hFolded_km && satResult.hFolded_km.length >= 2) {
+            ctx.strokeStyle = satResult.color;
+            ctx.globalAlpha = 0.55;
+            ctx.lineWidth = 1.3;
+            ctx.setLineDash([2, 3]);
             ctx.beginPath();
             let hasDFolded = false;
-            for (let i = 0; i < hFolded_km.length; i++) {
-                if (!isFinite(hFolded_km[i])) continue;
-                const x = padding.left + (i / (hFolded_km.length - 1)) * plotW;
-                const y = padding.top + (1 - (hFolded_km[i] - yMin) / yRange) * plotH;
+            for (let i = 0; i < satResult.hFolded_km.length; i++) {
+                if (!isFinite(satResult.hFolded_km[i])) continue;
+                const x = padding.left + (i / (satResult.hFolded_km.length - 1)) * plotW;
+                const y = padding.top + (1 - (satResult.hFolded_km[i] - yMin) / yRange) * plotH;
                 if (!hasDFolded) { ctx.moveTo(x, y); hasDFolded = true; }
                 else ctx.lineTo(x, y);
             }
             ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.globalAlpha = 1;
         }
 
         // 再入大气层标记线（100km）
         const reentryY = padding.top + (1 - (100 - yMin) / yRange) * plotH;
         if (reentryY > padding.top && reentryY < padding.top + plotH) {
-            ctx.strokeStyle = 'rgba(255,60,60,0.3)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([2, 6]);
+            ctx.strokeStyle = 'rgba(255,60,60,0.25)';
+            ctx.lineWidth = 0.8;
+            ctx.setLineDash([1, 5]);
             ctx.beginPath();
             ctx.moveTo(padding.left, reentryY);
             ctx.lineTo(padding.left + plotW, reentryY);
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.fillStyle = 'rgba(255,60,60,0.7)';
-            ctx.font = '9px Consolas, monospace';
+            ctx.fillStyle = 'rgba(255,60,60,0.5)';
+            ctx.font = '8px Consolas, monospace';
             ctx.textAlign = 'left';
-            ctx.fillText('再入大气层 (100km)', padding.left + 4, reentryY - 4);
+            ctx.fillText('再入(100km)', padding.left + 3, reentryY - 3);
         }
     }
 
-    // ====================== 仿真逻辑 ======================
-    let simData = null;
-    let simDataFolded = null;
+    // ====================== 仿真逻辑（多卫星） ======================
+    let allSatResults = []; // [{name, h_km, hFolded_km, initAlt, color}, ...]
 
     function readParams() {
         return {
-            h0: parseFloat(document.getElementById('pHeight').value),
-            inc: parseFloat(document.getElementById('pInclination').value),
             mass: parseFloat(document.getElementById('pMass').value),
             Cd: parseFloat(document.getElementById('pCd').value),
             Ad: parseFloat(document.getElementById('pAdrag').value),
@@ -585,37 +601,50 @@
 
     function runSimulation() {
         const p = readParams();
-        if (p.h0 < 100 || p.h0 > 2000 || p.inc < 0 || p.inc > 180 || p.mass < 1 || p.mass > 10000) return;
-        // 正常衰减
-        simData = calculateOrbitDecay(p.h0, p.mass, p.Cd, p.Ad, p.As, p.Ps, p.inc, p.years);
-        // 太阳翼收拢：迎风面积降80%，光压面积降95%
-        simDataFolded = calculateOrbitDecay(p.h0, p.mass, p.Cd, p.Ad * 0.2, p.As * 0.05, p.Ps, p.inc, p.years);
+        if (allSatellites.length === 0) {
+            drawMainChart([], 5);
+            return;
+        }
+        allSatResults = [];
+        for (let idx = 0; idx < allSatellites.length; idx++) {
+            const sat = allSatellites[idx];
+            const color = SAT_COLORS[idx % SAT_COLORS.length];
+            const h0 = sat.altitude;
+            const inc = sat.inclination;
+            const data = calculateOrbitDecay(h0, p.mass, p.Cd, p.Ad, p.As, p.Ps, inc, p.years);
+            const dataFolded = calculateOrbitDecay(h0, p.mass, p.Cd, p.Ad * 0.2, p.As * 0.05, p.Ps, inc, p.years);
+            const { h_m, months } = data;
+            const h_km = new Float64Array(months);
+            for (let i = 0; i < months; i++) h_km[i] = h_m[i] / 1000;
+            const { h_m: hf } = dataFolded;
+            const hFolded_km = new Float64Array(months);
+            for (let i = 0; i < months; i++) hFolded_km[i] = hf[i] / 1000;
+            allSatResults.push({
+                name: sat.name,
+                id: sat.id,
+                constellation: sat.constellation,
+                color: color,
+                h_km: h_km,
+                hFolded_km: hFolded_km,
+                initAlt: h0
+            });
+        }
         redrawChart();
     }
 
     function redrawChart() {
-        if (!simData) return;
-        const { h_m, months } = simData;
-        const h_km = new Float64Array(months);
-        for (let i = 0; i < months; i++) h_km[i] = h_m[i] / 1000;
-        // 太阳翼收拢高度数据
-        let hFolded_km = null;
-        if (simDataFolded) {
-            const { h_m: hf } = simDataFolded;
-            hFolded_km = new Float64Array(months);
-            for (let i = 0; i < months; i++) hFolded_km[i] = hf[i] / 1000;
-        }
-        drawMainChart(h_km, 5, hFolded_km);
-        // 更新结果显示
-        const initH = h_km[0];
-        const finalH = h_km[h_km.length - 1];
-        document.getElementById('rdInit').textContent = initH.toFixed(1) + ' km';
-        document.getElementById('rd5y').textContent = finalH.toFixed(1) + ' km';
-        document.getElementById('rdDrop').textContent = (initH - finalH).toFixed(1) + ' km';
-        if (hFolded_km) {
-            const finalHF = hFolded_km[hFolded_km.length - 1];
-            document.getElementById('rdFolded').textContent = finalHF.toFixed(1) + ' km';
-            document.getElementById('rdDropFolded').textContent = (initH - finalHF).toFixed(1) + ' km';
+        drawAllCharts(allSatResults, 5);
+        // 更新结果显示：显示最高和最低的最终高度
+        if (allSatResults.length > 0) {
+            const initHs = allSatResults.map(r => r.initAlt);
+            const finalHs = allSatResults.map(r => r.h_km[r.h_km.length - 1]);
+            const maxInit = Math.max(...initHs);
+            const minFinal = Math.min(...finalHs);
+            document.getElementById('rdInit').textContent = maxInit.toFixed(1) + ' km（最高）';
+            document.getElementById('rd5y').textContent = minFinal.toFixed(1) + ' km（最低）';
+            document.getElementById('rdDrop').textContent = '多卫星（见曲线）';
+            document.getElementById('rdFolded').textContent = '—（多卫星）';
+            document.getElementById('rdDropFolded').textContent = '—';
         }
     }
 
@@ -642,22 +671,27 @@
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
-            if (simData) {
-                redrawChart();
+            if (allSatResults.length > 0) {
+                drawAllCharts(allSatResults, 5);
             } else {
-                initChart();
+                const container = document.getElementById('charts-container');
+                if (container) container.innerHTML = '<div style="color:#445566;font-size:14px;text-align:center;padding:40px;">等待卫星数据...</div>';
             }
         }, 200);
     });
 
     // ====================== 初始化 ======================
-    initChart();
+    const container = document.getElementById('charts-container');
+    if (container) container.innerHTML = '<div style="color:#445566;font-size:14px;text-align:center;padding:40px;">加载卫星数据中...</div>';
     loadDisplayListSatellites();
+    // 自动执行多卫星轨道衰减计算
+    setTimeout(() => { runSimulation(); }, 200);
 
     // 监听显示列表变化（当从其他标签页添加卫星后返回时）
     window.addEventListener('storage', (e) => {
         if (e.key === 'tec_display_satellites') {
             loadDisplayListSatellites();
+            runSimulation();
         }
     });
 </script>

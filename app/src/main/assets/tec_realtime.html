@@ -1310,13 +1310,17 @@
                 if (!satTrailHistory.has(id)) {
                     satTrailHistory.set(id, []);
                 }
-                const trail = satTrailHistory.get(id);
-                // 添加当前位置（启用播放时不添加，由预测帧管理）
-                if (!playbackTimer) {
-                    satTrailUpdateCounter++;
-                    if (satTrailUpdateCounter >= 10) {
-                        satTrailUpdateCounter = 0;
-                        trail.push({ lat: sat.lat, lon: sat.lon });
+            }
+            // 按固定间隔为所有卫星同时添加轨迹点（播放中跳过）
+            if (!playbackTimer) {
+                satTrailUpdateCounter++;
+                if (satTrailUpdateCounter >= 10) {
+                    satTrailUpdateCounter = 0;
+                    for (const sat of data) {
+                        if (typeof sat.lat !== 'number' || typeof sat.lon !== 'number') continue;
+                        const id = sat.id || sat.name;
+                        const trail = satTrailHistory.get(id);
+                        if (trail) trail.push({ lat: sat.lat, lon: sat.lon });
                     }
                 }
             }
@@ -1542,9 +1546,53 @@
             }
         }
 
-        // 每 3 秒自动刷新卫星标记（从 localStorage 读取最新位置），播放中跳过
+        // 实时传播卫星位置到当前时间（不依赖 3D 导航页面），供卫星标记刷新使用
+        function updateRealtimeSatellitePositions() {
+            try {
+                const raw = localStorage.getItem('tec_display_satellites');
+                if (!raw) return false;
+                const sats = JSON.parse(raw);
+                if (!Array.isArray(sats) || sats.length === 0) return false;
+                // 检查是否有 TLE 数据可传播
+                let hasTle = false;
+                for (const s of sats) {
+                    if (s.tle1 && s.tle2) { hasTle = true; break; }
+                }
+                if (!hasTle) return false;
+
+                const now = new Date();
+                const gmst = satellite.gstime(now);
+                let updated = false;
+                for (const sat of sats) {
+                    if (!sat.tle1 || !sat.tle2) continue;
+                    try {
+                        const satrec = satellite.twoline2satrec(sat.tle1, sat.tle2);
+                        const pv = satellite.propagate(satrec, now);
+                        if (pv.position) {
+                            const gd = satellite.eciToGeodetic(pv.position, gmst);
+                            sat.lat = parseFloat((gd.latitude * 180 / Math.PI).toFixed(4));
+                            sat.lon = parseFloat((gd.longitude * 180 / Math.PI).toFixed(4));
+                            updated = true;
+                        }
+                    } catch (e) {
+                        // 单颗卫星传播失败，跳过
+                    }
+                }
+                if (updated) {
+                    localStorage.setItem('tec_display_satellites', JSON.stringify(sats));
+                }
+                return updated;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // 每 3 秒自动传播卫星位置并刷新标记（播放中跳过）
         setInterval(() => {
-            if (!playbackTimer) refreshSatelliteMarkers();
+            if (!playbackTimer) {
+                updateRealtimeSatellitePositions();
+                refreshSatelliteMarkers();
+            }
         }, 3000);
 
         // ====================== 垂直 TECU 色条 ======================
