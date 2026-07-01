@@ -249,39 +249,40 @@
             flex-wrap: wrap;
             gap: 8px;
         }
-        #step-selector {
+        #speed-selector {
             display: flex;
             align-items: center;
             gap: 6px;
             margin-top: 6px;
         }
-        #step-label {
+        #speed-label {
             font-size: 10px;
             color: #8899aa;
             white-space: nowrap;
         }
-        #step-options {
+        #speed-options {
             display: flex;
             gap: 3px;
             flex: 1;
         }
-        .step-opt {
+        .speed-opt {
             flex: 1;
             text-align: center;
-            font-size: 10px;
-            padding: 3px 0;
+            font-size: 12px;
+            padding: 2px 26px;
             background: #1a2a3a;
             color: #667788;
-            border-radius: 3px;
+            border-radius: 5px;
             cursor: pointer;
             transition: all 0.2s;
             user-select: none;
+            font-weight: bold;
         }
-        .step-opt:hover {
+        .speed-opt:hover {
             background: #2a3a4a;
             color: #88bbdd;
         }
-        .step-opt.active {
+        .speed-opt.active {
             background: #004488;
             color: #ccddff;
             font-weight: bold;
@@ -387,14 +388,12 @@
 
             <div class="panel-section" id="controls-section">
                 <button class="btn-primary" id="btnLoadRT">计算TEC</button>
-                <div id="step-selector">
-                    <span id="step-label">步长</span>
-                    <div id="step-options">
-                        <span class="step-opt active" data-step="1">1h</span>
-                        <span class="step-opt" data-step="0.5">30m</span>
-                        <span class="step-opt" data-step="0.1667">10m</span>
-                        <span class="step-opt" data-step="0.08333">5m</span>
-                        <span class="step-opt" data-step="0.01667">1m</span>
+                <div id="speed-selector">
+                    <span id="speed-label">速度</span>
+                    <div id="speed-options">
+                        <span class="speed-opt active" data-delay="500">慢</span>
+                        <span class="speed-opt" data-delay="350">中</span>
+                        <span class="speed-opt" data-delay="200">快</span>
                     </div>
                 </div>
                 <button class="btn-secondary" id="btnPredict24h">▶ 预测24小时TEC</button>
@@ -613,12 +612,14 @@
         // 卫星轨迹：不预存所有帧，改为按需计算
         let satPlaybackRecs = [];   // [{id, name, constellation, color, satrec}] 用于实时计算
         let satPlaybackTrail = [];  // [{id, lat, lon}, ...] 播放中累积的轨迹点（按帧采样）
-        const MAX_PLAYBACK_TRAIL_POINTS = 500; // 最多保留500个轨迹点
+        let MAX_PLAYBACK_TRAIL_POINTS = 500; // 最多保留500个轨迹点（根据步长动态调整）
         let satTleCache = null;
         // 轨迹连续经度缓存，避免跨经线时突然跳转到反向位置
         const lastLonBySat = new Map();
         // 绘制时的上一帧经度缓存，用于刷新及预测绘制间的平滑显示
         const lastDrawnLonBySat = new Map();
+        // TEC 帧画布缓存：避免相同 tecIndex 时重复渲染热力图
+        const tecFrameCache = new Map(); // key: tecIndex, value: rendered Canvas
 
         /**
          * 从 localStorage 读取显示列表卫星，创建 satrec 对象（不预计算位置，按需计算）
@@ -722,6 +723,7 @@
                 satPlaybackRecs = [];
                 satPlaybackTrail = [];
                 playbackGrid = null;
+                tecFrameCache.clear();
                 refreshSatelliteMarkers();
                 return;
             }
@@ -752,12 +754,14 @@
                     if (val !== '') memoryLags.dst[lag] = parseFloat(val);
                 });
 
-                // 读取步长选择
-                const activeStep = document.querySelector('.step-opt.active');
-                const stepHours = parseFloat(activeStep ? activeStep.dataset.step : '1');
-                const stepMinutes = Math.round(stepHours * 60);
+                // 固定步长为 1m
+                const stepHours = 0.01667;
+                const stepMinutes = 1;
                 const stepMs = stepMinutes * 60000;
                 const totalFrames = Math.round(24 * 60 / stepMinutes);
+                // 读取播放速度选择
+                const activeSpeed = document.querySelector('.speed-opt.active');
+                const frameDelay = parseInt(activeSpeed ? activeSpeed.dataset.delay : '350');
 
                 // Step 1: 预计算 24 帧 TEC（每 UTC 小时一帧，与步长无关）
                 playbackFrames = [];
@@ -825,6 +829,10 @@
                     satTleCache = raw ? JSON.parse(raw) : null;
                 } catch (e) { satTleCache = null; }
 
+                // 所有步长均每帧采集轨迹点，统一上限500个
+                const trailStride = 1;
+                MAX_PLAYBACK_TRAIL_POINTS = 500;
+
                 // 开始播放
                 playbackIndex = 0;
                 statusText.textContent = '▶ 播放中...';
@@ -833,7 +841,7 @@
                     return `${String(t.bjHour).padStart(2, '0')}:${String(t.bjMin).padStart(2, '0')}`;
                 }
                 const first = playbackTimes[0];
-                renderTECMapCompressed(playbackFrames[first.tecIndex], first.doy, first.utHour);
+                renderTECMapCompressed(playbackFrames[first.tecIndex], first.doy, first.utHour, first.tecIndex);
                 const firstSatFrame = computeSinglePlaybackFrame(first);
                 drawPredictedSatMarkers(firstSatFrame);
                 for (const s of firstSatFrame) {
@@ -844,7 +852,7 @@
 
                 btn.disabled = false;
 
-                // 每隔 350ms 播放一帧
+                // 按选择的速度间隔播放一帧
                 playbackTimer = setInterval(() => {
                     playbackIndex++;
                     if (playbackIndex >= totalFrames) {
@@ -856,23 +864,28 @@
                         satPlaybackRecs = [];
                         satPlaybackTrail = [];
                         playbackGrid = null;
+                        tecFrameCache.clear();
                         refreshSatelliteMarkers();
                         return;
                     }
 
                     const t = playbackTimes[playbackIndex];
-                    renderTECMapCompressed(playbackFrames[t.tecIndex], t.doy, t.utHour);
+                    renderTECMapCompressed(playbackFrames[t.tecIndex], t.doy, t.utHour, t.tecIndex);
                     const satFrame = computeSinglePlaybackFrame(t);
-                    for (const s of satFrame) {
-                        satPlaybackTrail.push({ id: s.id, lat: s.lat, lon: s.lon });
-                    }
-                    if (satPlaybackTrail.length > MAX_PLAYBACK_TRAIL_POINTS) {
-                        satPlaybackTrail.splice(0, satPlaybackTrail.length - MAX_PLAYBACK_TRAIL_POINTS);
+                    // 降采样：按 trailStride 间隔采集轨迹点，避免轨迹点过密
+                    if (playbackIndex % trailStride === 0) {
+                        for (const s of satFrame) {
+                            satPlaybackTrail.push({ id: s.id, lat: s.lat, lon: s.lon });
+                        }
+                        if (satPlaybackTrail.length > MAX_PLAYBACK_TRAIL_POINTS) {
+                            const excess = satPlaybackTrail.length - MAX_PLAYBACK_TRAIL_POINTS;
+                            satPlaybackTrail.splice(0, excess);
+                        }
                     }
                     drawPredictedSatMarkers(satFrame);
                     statusText.textContent = `▶ 播放中  ${fmtTime(t)} (${playbackIndex + 1}/${totalFrames})`;
                     fillBar.style.width = `${((playbackIndex + 1) / totalFrames) * 100}%`;
-                }, 350);
+                }, frameDelay);
 
             } catch (e) {
                 console.error('[24h TEC] 预测失败:', e);
@@ -918,8 +931,12 @@
 
         /**
          * 使用压缩的 Float32Array 渲染 TEC 热力图（跳过 GeoJSON 解析）
+         * @param {Float32Array} tecArray - TEC 数据数组
+         * @param {number} doy - 年积日
+         * @param {number} utHour - UTC 小时
+         * @param {number} [cacheKey] - 可选缓存键（tecIndex），相同键时跳过重复渲染
          */
-        function renderTECMapCompressed(tecArray, doy, utHour) {
+        function renderTECMapCompressed(tecArray, doy, utHour, cacheKey) {
             const g = playbackGrid;
             if (!g || !tecArray) return;
 
@@ -958,34 +975,49 @@
                 ctx.restore();
             }
 
-            // 第二步：离屏 canvas 渲染热力图
-            const offCanvas = document.createElement('canvas');
-            offCanvas.width = MAP_W;
-            offCanvas.height = MAP_H;
-            const offCtx = offCanvas.getContext('2d');
-            const imageData = offCtx.createImageData(MAP_W, MAP_H);
-            const pixels = imageData.data;
+            // 第二步：离屏 canvas 渲染热力图（带缓存）
+            const useCache = (typeof cacheKey === 'number');
+            let offCanvas = null;
 
-            for (let py = 0; py < MAP_H; py++) {
-                const lat = 90 - (py / MAP_H) * 180;
-                for (let px = 0; px < MAP_W; px++) {
-                    const lon = (px / MAP_W) * 360 - 180;
-                    const tec = interpolateTec(lat, lon);
-                    const t = Math.min(Math.max(tec / 100, 0), 1);
-                    let r, g, b;
-                    if (t < 0.125)      { r = 0;   g = 0;   b = 0.5 + t * 4; }
-                    else if (t < 0.375)  { r = 0;   g = (t - 0.125) * 4; b = 1; }
-                    else if (t < 0.625)  { r = (t - 0.375) * 4; g = 1; b = 1 - (t - 0.375) * 4; }
-                    else if (t < 0.875)  { r = 1;   g = 1 - (t - 0.625) * 4; b = 0; }
-                    else                 { r = 1 - (t - 0.875) * 2; g = 0;   b = 0; }
-                    const idx = (py * MAP_W + px) * 4;
-                    pixels[idx]     = Math.floor(r * 255);
-                    pixels[idx + 1] = Math.floor(g * 255);
-                    pixels[idx + 2] = Math.floor(b * 255);
-                    pixels[idx + 3] = 255;
+            if (useCache && tecFrameCache.has(cacheKey)) {
+                // 使用缓存的 TEC 热力图
+                offCanvas = tecFrameCache.get(cacheKey);
+            } else {
+                // 新建离屏 canvas 渲染热力图
+                offCanvas = document.createElement('canvas');
+                offCanvas.width = MAP_W;
+                offCanvas.height = MAP_H;
+                const offCtx = offCanvas.getContext('2d');
+                const imageData = offCtx.createImageData(MAP_W, MAP_H);
+                const pixels = imageData.data;
+
+                for (let py = 0; py < MAP_H; py++) {
+                    const lat = 90 - (py / MAP_H) * 180;
+                    for (let px = 0; px < MAP_W; px++) {
+                        const lon = (px / MAP_W) * 360 - 180;
+                        const tec = interpolateTec(lat, lon);
+                        const t = Math.min(Math.max(tec / 100, 0), 1);
+                        let r, g, b;
+                        if (t < 0.125)      { r = 0;   g = 0;   b = 0.5 + t * 4; }
+                        else if (t < 0.375)  { r = 0;   g = (t - 0.125) * 4; b = 1; }
+                        else if (t < 0.625)  { r = (t - 0.375) * 4; g = 1; b = 1 - (t - 0.375) * 4; }
+                        else if (t < 0.875)  { r = 1;   g = 1 - (t - 0.625) * 4; b = 0; }
+                        else                 { r = 1 - (t - 0.875) * 2; g = 0;   b = 0; }
+                        const idx = (py * MAP_W + px) * 4;
+                        pixels[idx]     = Math.floor(r * 255);
+                        pixels[idx + 1] = Math.floor(g * 255);
+                        pixels[idx + 2] = Math.floor(b * 255);
+                        pixels[idx + 3] = 255;
+                    }
+                }
+                offCtx.putImageData(imageData, 0, 0);
+
+                // 写入缓存
+                if (useCache) {
+                    tecFrameCache.set(cacheKey, offCanvas);
                 }
             }
-            offCtx.putImageData(imageData, 0, 0);
+
             ctx.save();
             ctx.globalAlpha = 0.45;
             ctx.drawImage(offCanvas, MAP_MARGIN.left, MAP_MARGIN.top);
@@ -1347,7 +1379,10 @@
             }
         }
 
-        /** 绘制一条轨迹线（渐变透明度，新→旧） */
+        /** 绘制一条轨迹线（渐变透明度，新→旧）
+         *  优化：将线段按透明度分桶（桶数 ALPHA_LEVELS），每个桶内的线段用单一路径批量绘制，
+         *  大幅减少 stroke() 调用次数（从 O(N) 降为 O(ALPHA_LEVELS)）。
+         */
         function drawTrailLine(trail, color) {
             // 将经纬度点转为连续 canvas 坐标（处理经线穿越）
             const pts = [];
@@ -1376,19 +1411,36 @@
                 const dx = !isLast ? Math.abs(pts[i].x - pts[i - 1].x) : 0;
                 if (dx > MAX_DX || isLast) {
                     if (i - segStart >= 2) {
-                        // 渐变绘制：从旧（segStart）到新（i-1）
                         const segLen = i - segStart;
+                        // 按透明度分桶：将连续渐变的线段分到 ALPHA_LEVELS 个桶中
+                        const ALPHA_LEVELS = 12;
+                        const buckets = new Array(ALPHA_LEVELS);
+                        for (let b = 0; b < ALPHA_LEVELS; b++) buckets[b] = [];
+                        for (let j = segStart; j < i - 1; j++) {
+                            const t = (j - segStart) / segLen;
+                            const alpha = 0.35 + 0.50 * t;
+                            const bucketIdx = Math.min(
+                                Math.floor((alpha - 0.35) / 0.50 * ALPHA_LEVELS),
+                                ALPHA_LEVELS - 1
+                            );
+                            // 只存端点索引，节省内存
+                            buckets[bucketIdx].push(j);
+                        }
+                        // 逐桶批量绘制
                         markerCtx.save();
                         markerCtx.shadowColor = `rgba(${rgb}, 0.6)`;
                         markerCtx.shadowBlur = 4;
-                        for (let j = segStart; j < i - 1; j++) {
-                            const t = (j - segStart) / segLen;  // 0 = 最旧, ~1 = 最新
-                            const alpha = 0.35 + 0.50 * t;      // 旧→新，0.35→0.85
+                        markerCtx.lineWidth = 2.2;
+                        for (let b = 0; b < ALPHA_LEVELS; b++) {
+                            const segs = buckets[b];
+                            if (segs.length === 0) continue;
+                            const alpha = 0.35 + (b + 0.5) / ALPHA_LEVELS * 0.50;
                             markerCtx.strokeStyle = `rgba(${rgb}, ${alpha.toFixed(3)})`;
-                            markerCtx.lineWidth = 2.2;
                             markerCtx.beginPath();
-                            markerCtx.moveTo(pts[j].x, pts[j].y);
-                            markerCtx.lineTo(pts[j + 1].x, pts[j + 1].y);
+                            for (const j of segs) {
+                                markerCtx.moveTo(pts[j].x, pts[j].y);
+                                markerCtx.lineTo(pts[j + 1].x, pts[j + 1].y);
+                            }
                             markerCtx.stroke();
                         }
                         markerCtx.restore();
@@ -1411,11 +1463,14 @@
 
             // ===== 绘制连续轨迹线（使用 satPlaybackTrail 累积轨迹） =====
             if (playbackTimer && satPlaybackTrail.length > 0) {
-                // 按卫星分组轨迹点
-                const trailBySat = new Map();
+                // 按卫星分组轨迹点（使用预构建的 trailCache 避免每帧重建 Map）
+                if (!window._trailCache) window._trailCache = new Map();
+                const trailBySat = window._trailCache;
+                trailBySat.clear();
                 for (const tp of satPlaybackTrail) {
-                    if (!trailBySat.has(tp.id)) trailBySat.set(tp.id, []);
-                    trailBySat.get(tp.id).push({ lat: tp.lat, lon: tp.lon });
+                    let list = trailBySat.get(tp.id);
+                    if (!list) { list = []; trailBySat.set(tp.id, list); }
+                    list.push(tp); // 直接引用 tp 对象，避免创建新对象
                 }
                 // 为当前帧的每颗卫星绘制其累积轨迹
                 for (const sat of sats) {
@@ -1661,11 +1716,11 @@
             refreshSatelliteMarkers();
         });
 
-        // 步长选择切换
-        document.querySelectorAll('.step-opt').forEach(el => {
+        // 播放速度选择切换
+        document.querySelectorAll('.speed-opt').forEach(el => {
             el.addEventListener('click', function() {
                 if (playbackTimer) return; // 播放中不可切换
-                document.querySelectorAll('.step-opt').forEach(s => s.classList.remove('active'));
+                document.querySelectorAll('.speed-opt').forEach(s => s.classList.remove('active'));
                 this.classList.add('active');
             });
         });
