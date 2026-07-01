@@ -231,6 +231,77 @@
         }
         .custom-sat-item .del-btn:hover { background: rgba(255,60,60,0.4); }
 
+        /* 弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-box {
+            background: #0d1030;
+            border: 2px solid rgba(68,136,170,0.5);
+            border-radius: 10px;
+            padding: 24px;
+            width: 360px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 30px rgba(0,100,200,0.3);
+        }
+        .modal-box h3 {
+            color: #88ccff;
+            font-size: 15px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .modal-param {
+            margin-bottom: 10px;
+        }
+        .modal-param label {
+            display: block;
+            color: #88aacc;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+        .modal-param input {
+            width: 100%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(68,136,170,0.4);
+            color: #fff;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .modal-param input:focus { border-color: #88ccff; outline: none; }
+        .modal-param .unit { color: #667788; font-size: 10px; float: right; margin-top: 2px; }
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .modal-btns button {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .modal-btn-confirm {
+            background: linear-gradient(135deg, #008844, #006633);
+            color: white;
+        }
+        .modal-btn-cancel {
+            background: rgba(255,255,255,0.1);
+            color: #8899aa;
+            border: 1px solid rgba(255,255,255,0.15) !important;
+        }
+
         
     </style>
 </head>
@@ -267,7 +338,10 @@
                 <style>#satSelector option { background: #0a0a2a; color: #ccddee; }</style>
                 <div style="color:#667788;font-size:9px;margin-top:4px;">选中后自动填充高度和倾角，可手动修改</div>
             </div>
-            
+            <button class="btn-add" id="btnAddCustom" style="width:100%;margin-bottom:8px;">➕ 添加自定义卫星</button>
+            <div id="customSatList" style="max-height:160px;overflow-y:auto;margin-bottom:10px;">
+                <!-- 已添加的自定义卫星列表 -->
+            </div>
             <div class="param-grid">
                 <div class="param-item" id="piHeight">
                     <label>初始轨道高度</label>
@@ -315,21 +389,54 @@
             </div>
         </div>
 
-        <!-- 自定义卫星 -->
-        <div class="panel-section">
-            <div class="section-title">🔧 自定义卫星</div>
-            <div style="margin-bottom:8px;">
-                <div class="param-item" style="margin-bottom:6px;">
-                    <label>卫星名称</label>
-                    <input id="custName" type="text" placeholder="输入自定义卫星名称" style="text-align:left;">
-                </div>
-                <div style="color:#667788;font-size:9px;margin-bottom:6px;">使用上方参数框中的高度、倾角、质量等参数</div>
-                <button class="btn-add" id="btnAddCustom">➕ 添加自定义卫星</button>
-            </div>
-            <div id="customSatList" style="max-height:200px;overflow-y:auto;">
-                <!-- 已添加的自定义卫星列表 -->
-            </div>
+<!-- 弹窗 -->
+<div class="modal-overlay" id="customModalOverlay">
+    <div class="modal-box">
+        <h3>🔧 添加自定义卫星</h3>
+        <div class="modal-param">
+            <label>卫星名称</label>
+            <input id="modalCustName" type="text" placeholder="输入卫星名称">
         </div>
+        <div class="modal-param">
+            <label>初始轨道高度</label>
+            <input id="modalCustH" type="number" value="300" min="100" max="2000" step="10">
+            <span class="unit">km</span>
+        </div>
+        <div class="modal-param">
+            <label>轨道倾角</label>
+            <input id="modalCustInc" type="number" value="45" min="0" max="180" step="1">
+            <span class="unit">°</span>
+        </div>
+        <div class="modal-param">
+            <label>卫星质量</label>
+            <input id="modalCustMass" type="number" value="240" min="1" max="10000" step="1">
+            <span class="unit">kg</span>
+        </div>
+        <div class="modal-param">
+            <label>阻力系数 Cd</label>
+            <input id="modalCustCd" type="number" value="2.2" min="1" max="3" step="0.01">
+        </div>
+        <div class="modal-param">
+            <label>迎风面积</label>
+            <input id="modalCustAd" type="number" value="1.5" min="0.01" max="50" step="0.01">
+            <span class="unit">m²</span>
+        </div>
+        <div class="modal-param">
+            <label>光压面积</label>
+            <input id="modalCustAs" type="number" value="7" min="0.01" max="50" step="0.01">
+            <span class="unit">m²</span>
+        </div>
+        <div class="modal-param">
+            <label>太阳风动压</label>
+            <input id="modalCustPs" type="number" value="4.56" min="1" max="10" step="0.01">
+            <span class="unit">×10⁻⁶ N/m²</span>
+        </div>
+        <div class="modal-btns">
+            <button class="modal-btn-cancel" onclick="hideCustomModal()">取消</button>
+            <button class="modal-btn-confirm" onclick="submitCustomSatellite()">确认添加</button>
+        </div>
+    </div>
+</div>
 
 <script src="satellite.min.js"></script>
 <script>
@@ -396,30 +503,43 @@
     let customSatellites = []; // [{name, altitude, inclination, mass, Cd, Ad, As, Ps}, ...]
     let customIdCounter = 0;
 
-    function addCustomSatellite() {
-        const nameInput = document.getElementById('custName');
-        const name = (nameInput.value || '').trim();
+    function showCustomModal() {
+        // 预填当前参数框的值
+        document.getElementById('modalCustName').value = '';
+        document.getElementById('modalCustH').value = document.getElementById('pHeight').value;
+        document.getElementById('modalCustInc').value = document.getElementById('pInclination').value;
+        document.getElementById('modalCustMass').value = document.getElementById('pMass').value;
+        document.getElementById('modalCustCd').value = document.getElementById('pCd').value;
+        document.getElementById('modalCustAd').value = document.getElementById('pAdrag').value;
+        document.getElementById('modalCustAs').value = document.getElementById('pAsrp').value;
+        document.getElementById('modalCustPs').value = document.getElementById('pPsrp').value;
+        document.getElementById('customModalOverlay').classList.add('show');
+    }
+
+    function hideCustomModal() {
+        document.getElementById('customModalOverlay').classList.remove('show');
+    }
+
+    function submitCustomSatellite() {
+        const name = (document.getElementById('modalCustName').value || '').trim();
         if (!name) {
-            nameInput.style.borderColor = '#ff4444';
-            setTimeout(() => { nameInput.style.borderColor = ''; }, 1500);
+            document.getElementById('modalCustName').style.borderColor = '#ff4444';
+            setTimeout(() => { document.getElementById('modalCustName').style.borderColor = ''; }, 1500);
             return;
         }
-        const p = readParams();
-        const h = parseFloat(document.getElementById('pHeight').value);
-        const inc = parseFloat(document.getElementById('pInclination').value);
         customIdCounter++;
         customSatellites.push({
             name: name,
             id: '__custom_' + customIdCounter,
-            altitude: h,
-            inclination: inc,
-            mass: p.mass,
-            Cd: p.Cd,
-            Ad: p.Ad,
-            As: p.As,
-            Ps: p.Ps
+            altitude: parseFloat(document.getElementById('modalCustH').value) || 300,
+            inclination: parseFloat(document.getElementById('modalCustInc').value) || 45,
+            mass: parseFloat(document.getElementById('modalCustMass').value) || 240,
+            Cd: parseFloat(document.getElementById('modalCustCd').value) || 2.2,
+            Ad: parseFloat(document.getElementById('modalCustAd').value) || 1.5,
+            As: parseFloat(document.getElementById('modalCustAs').value) || 7,
+            Ps: (parseFloat(document.getElementById('modalCustPs').value) || 4.56) * 1e-6
         });
-        nameInput.value = '';
+        hideCustomModal();
         renderCustomSatList();
         populateSatSelector();
         runSimulation();
@@ -881,7 +1001,11 @@
     document.getElementById('btnCalc').addEventListener('click', runSimulation);
 
     // 添加自定义卫星按钮
-    document.getElementById('btnAddCustom').addEventListener('click', addCustomSatellite);
+    document.getElementById('btnAddCustom').addEventListener('click', showCustomModal);
+    // 点击遮罩层关闭弹窗
+    document.getElementById('customModalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) hideCustomModal();
+    });
 
     // 初始渲染自定义卫星列表
     renderCustomSatList();
