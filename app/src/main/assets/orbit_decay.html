@@ -826,14 +826,35 @@
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         let hasDrawn = false;
-        for (let i = 0; i < N; i++) {
+        const actualN = (satResult.reentryMonth >= 0) ? satResult.reentryMonth + 1 : N;
+        let reentryPx = -1, reentryPy = -1;
+        for (let i = 0; i < actualN && i < N; i++) {
             if (!isFinite(satResult.h_km[i])) continue;
             const x = padding.left + (i / (N - 1)) * plotW;
             const y = padding.top + (1 - (satResult.h_km[i] - yMin) / yRange) * plotH;
             if (!hasDrawn) { ctx.moveTo(x, y); hasDrawn = true; }
             else ctx.lineTo(x, y);
+            if (i === actualN - 1 && satResult.reentryMonth >= 0) {
+                reentryPx = x; reentryPy = y;
+            }
         }
         ctx.stroke();
+        // 再入标记
+        if (reentryPx >= 0) {
+            ctx.fillStyle = '#ff4444';
+            ctx.globalAlpha = 0.9;
+            ctx.beginPath();
+            ctx.arc(reentryPx, reentryPy, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#ff6666';
+            ctx.font = 'bold 9px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('再入', reentryPx + 6, reentryPy - 4);
+        }
 
         // 太阳翼收拢曲线（虚线）
         if (satResult.hFolded_km && satResult.hFolded_km.length >= 2) {
@@ -843,7 +864,8 @@
             ctx.setLineDash([2, 3]);
             ctx.beginPath();
             let hasDFolded = false;
-            for (let i = 0; i < satResult.hFolded_km.length; i++) {
+            const foldedN = (satResult.reentryFoldedMonth >= 0) ? satResult.reentryFoldedMonth + 1 : satResult.hFolded_km.length;
+            for (let i = 0; i < foldedN && i < satResult.hFolded_km.length; i++) {
                 if (!isFinite(satResult.hFolded_km[i])) continue;
                 const x = padding.left + (i / (satResult.hFolded_km.length - 1)) * plotW;
                 const y = padding.top + (1 - (satResult.hFolded_km[i] - yMin) / yRange) * plotH;
@@ -944,6 +966,15 @@
             const { h_m: hf } = dataFolded;
             const hFolded_km = new Float64Array(months);
             for (let i = 0; i < months; i++) hFolded_km[i] = hf[i] / 1000;
+            // 检测再入大气层月份（高度 < 100km 或 NaN）
+            let reentryMonth = -1;
+            for (let i = 0; i < months; i++) {
+                if (!isFinite(h_km[i]) || h_km[i] < 100) { reentryMonth = i; break; }
+            }
+            let reentryFoldedMonth = -1;
+            for (let i = 0; i < months; i++) {
+                if (!isFinite(hFolded_km[i]) || hFolded_km[i] < 100) { reentryFoldedMonth = i; break; }
+            }
             allSatResults.push({
                 name: sat.name,
                 id: sat.id,
@@ -951,7 +982,9 @@
                 color: color,
                 h_km: h_km,
                 hFolded_km: hFolded_km,
-                initAlt: h0
+                initAlt: h0,
+                reentryMonth: reentryMonth,
+                reentryFoldedMonth: reentryFoldedMonth
             });
         }
         // 同步更新选中自定义卫星的存储参数
@@ -979,14 +1012,29 @@
             if (r) {
                 const h0 = r.initAlt;
                 const h5 = r.h_km[r.h_km.length - 1];
-                const drop = h0 - h5;
+                const reentry = r.reentryMonth >= 0 ? r.reentryMonth : -1;
+                const drop = h0 - (isFinite(h5) ? h5 : 100);
                 const h5f = r.hFolded_km ? r.hFolded_km[r.hFolded_km.length - 1] : null;
-                const dropF = h5f !== null ? (h0 - h5f) : null;
+                const reentryF = r.reentryFoldedMonth >= 0 ? r.reentryFoldedMonth : -1;
+                const dropF = h5f !== null ? (h0 - (isFinite(h5f) ? h5f : 100)) : null;
                 document.getElementById('rdInit').textContent = h0.toFixed(1) + ' km';
-                document.getElementById('rd5y').textContent = h5.toFixed(1) + ' km';
-                document.getElementById('rdDrop').textContent = drop.toFixed(1) + ' km';
-                document.getElementById('rdFolded').textContent = h5f !== null ? h5f.toFixed(1) + ' km' : '--';
-                document.getElementById('rdDropFolded').textContent = dropF !== null ? dropF.toFixed(1) + ' km' : '--';
+                if (reentry >= 0) {
+                    document.getElementById('rd5y').textContent = '已再入（' + reentry + '个月）';
+                    document.getElementById('rdDrop').textContent = '再入大气层';
+                } else {
+                    document.getElementById('rd5y').textContent = h5.toFixed(1) + ' km';
+                    document.getElementById('rdDrop').textContent = drop.toFixed(1) + ' km';
+                }
+                if (h5f !== null && reentryF >= 0) {
+                    document.getElementById('rdFolded').textContent = '已再入（' + reentryF + '个月）';
+                    document.getElementById('rdDropFolded').textContent = '再入大气层';
+                } else if (h5f !== null) {
+                    document.getElementById('rdFolded').textContent = h5f.toFixed(1) + ' km';
+                    document.getElementById('rdDropFolded').textContent = dropF.toFixed(1) + ' km';
+                } else {
+                    document.getElementById('rdFolded').textContent = '--';
+                    document.getElementById('rdDropFolded').textContent = '--';
+                }
                 return;
             }
         }
