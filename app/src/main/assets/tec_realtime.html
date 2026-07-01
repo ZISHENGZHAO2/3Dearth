@@ -607,6 +607,8 @@
         let playbackTimer = null;
         let playbackFrames = [];     // 固定 24 帧 TEC (Float32Array, 每帧一个 UTC 小时)
         let playbackIndex = 0;
+        let playbackTotalFrames = 0;
+        let playbackTrailStride = 1;
         let playbackTimes = [];     // 精细时间步 [{year, doy, utHour, bjHour, bjMin, utcMs, tecIndex}, ...]
         let playbackGrid = null;    // { minLat, minLon, latStep, lonStep, nLat, nLon }
         // 卫星轨迹：不预存所有帧，改为按需计算
@@ -620,6 +622,45 @@
         const lastDrawnLonBySat = new Map();
         // TEC 帧画布缓存：避免相同 tecIndex 时重复渲染热力图
         const tecFrameCache = new Map(); // key: tecIndex, value: rendered Canvas
+
+        function fmtTimePlayback(t) {
+            return `${String(t.bjHour).padStart(2, '0')}:${String(t.bjMin).padStart(2, '0')}`;
+        }
+
+        function playbackStep() {
+            const btn = document.getElementById('btnPredict24h');
+            const statusText = document.getElementById('playback-text');
+            const fillBar = document.getElementById('playback-fill');
+            playbackIndex++;
+            if (playbackIndex >= playbackTotalFrames) {
+                clearInterval(playbackTimer);
+                playbackTimer = null;
+                btn.textContent = '▶ 预测24小时TEC';
+                statusText.textContent = '✅ 播放完成';
+                fillBar.style.width = '100%';
+                satPlaybackRecs = [];
+                satPlaybackTrail = [];
+                playbackGrid = null;
+                tecFrameCache.clear();
+                refreshSatelliteMarkers();
+                return;
+            }
+            const t = playbackTimes[playbackIndex];
+            renderTECMapCompressed(playbackFrames[t.tecIndex], t.doy, t.utHour, t.tecIndex);
+            const satFrame = computeSinglePlaybackFrame(t);
+            if (playbackIndex % playbackTrailStride === 0) {
+                for (const s of satFrame) {
+                    satPlaybackTrail.push({ id: s.id, lat: s.lat, lon: s.lon });
+                }
+                if (satPlaybackTrail.length > MAX_PLAYBACK_TRAIL_POINTS) {
+                    const excess = satPlaybackTrail.length - MAX_PLAYBACK_TRAIL_POINTS;
+                    satPlaybackTrail.splice(0, excess);
+                }
+            }
+            drawPredictedSatMarkers(satFrame);
+            statusText.textContent = `▶ 播放中  ${fmtTimePlayback(t)} (${playbackIndex + 1}/${playbackTotalFrames})`;
+            fillBar.style.width = `${((playbackIndex + 1) / playbackTotalFrames) * 100}%`;
+        }
 
         /**
          * 从 localStorage 读取显示列表卫星，创建 satrec 对象（不预计算位置，按需计算）
@@ -759,6 +800,7 @@
                 const stepMinutes = 1;
                 const stepMs = stepMinutes * 60000;
                 const totalFrames = Math.round(24 * 60 / stepMinutes);
+                playbackTotalFrames = totalFrames;
                 // 读取播放速度选择
                 const activeSpeed = document.querySelector('.speed-opt.active');
                 const frameDelay = parseInt(activeSpeed ? activeSpeed.dataset.delay : '350');
@@ -831,15 +873,13 @@
 
                 // 所有步长均每帧采集轨迹点，统一上限500个
                 const trailStride = 1;
+                playbackTrailStride = trailStride;
                 MAX_PLAYBACK_TRAIL_POINTS = 500;
 
                 // 开始播放
                 playbackIndex = 0;
                 statusText.textContent = '▶ 播放中...';
 
-                function fmtTime(t) {
-                    return `${String(t.bjHour).padStart(2, '0')}:${String(t.bjMin).padStart(2, '0')}`;
-                }
                 const first = playbackTimes[0];
                 renderTECMapCompressed(playbackFrames[first.tecIndex], first.doy, first.utHour, first.tecIndex);
                 const firstSatFrame = computeSinglePlaybackFrame(first);
@@ -847,45 +887,13 @@
                 for (const s of firstSatFrame) {
                     satPlaybackTrail.push({ id: s.id, lat: s.lat, lon: s.lon });
                 }
-                statusText.textContent = `▶ 播放中  ${fmtTime(first)} (1/${totalFrames})`;
+                statusText.textContent = `▶ 播放中  ${fmtTimePlayback(first)} (1/${totalFrames})`;
                 fillBar.style.width = `${(1 / totalFrames) * 100}%`;
 
                 btn.disabled = false;
 
                 // 按选择的速度间隔播放一帧
-                playbackTimer = setInterval(() => {
-                    playbackIndex++;
-                    if (playbackIndex >= totalFrames) {
-                        clearInterval(playbackTimer);
-                        playbackTimer = null;
-                        btn.textContent = '▶ 预测24小时TEC';
-                        statusText.textContent = '✅ 播放完成';
-                        fillBar.style.width = '100%';
-                        satPlaybackRecs = [];
-                        satPlaybackTrail = [];
-                        playbackGrid = null;
-                        tecFrameCache.clear();
-                        refreshSatelliteMarkers();
-                        return;
-                    }
-
-                    const t = playbackTimes[playbackIndex];
-                    renderTECMapCompressed(playbackFrames[t.tecIndex], t.doy, t.utHour, t.tecIndex);
-                    const satFrame = computeSinglePlaybackFrame(t);
-                    // 降采样：按 trailStride 间隔采集轨迹点，避免轨迹点过密
-                    if (playbackIndex % trailStride === 0) {
-                        for (const s of satFrame) {
-                            satPlaybackTrail.push({ id: s.id, lat: s.lat, lon: s.lon });
-                        }
-                        if (satPlaybackTrail.length > MAX_PLAYBACK_TRAIL_POINTS) {
-                            const excess = satPlaybackTrail.length - MAX_PLAYBACK_TRAIL_POINTS;
-                            satPlaybackTrail.splice(0, excess);
-                        }
-                    }
-                    drawPredictedSatMarkers(satFrame);
-                    statusText.textContent = `▶ 播放中  ${fmtTime(t)} (${playbackIndex + 1}/${totalFrames})`;
-                    fillBar.style.width = `${((playbackIndex + 1) / totalFrames) * 100}%`;
-                }, frameDelay);
+                playbackTimer = setInterval(playbackStep, frameDelay);
 
             } catch (e) {
                 console.error('[24h TEC] 预测失败:', e);
@@ -1713,15 +1721,28 @@
         document.getElementById('btnClearTrail').addEventListener('click', function() {
             satTrailHistory.clear();
             satTrailUpdateCounter = 0;
-            refreshSatelliteMarkers();
+            satPlaybackTrail = [];
+            lastLonBySat.clear();      // 清除经度连续性缓存，避免卫星瞬移
+            lastDrawnLonBySat.clear(); // 同上
+            if (playbackTimer) {
+                // 播放期间：只清 markerCtx，不下发实时卫星标记，等待下次播放间隔自动绘制正确帧
+                markerCtx.clearRect(0, 0, W, H);
+            } else {
+                refreshSatelliteMarkers();
+            }
         });
 
         // 播放速度选择切换
         document.querySelectorAll('.speed-opt').forEach(el => {
             el.addEventListener('click', function() {
-                if (playbackTimer) return; // 播放中不可切换
                 document.querySelectorAll('.speed-opt').forEach(s => s.classList.remove('active'));
                 this.classList.add('active');
+                // 播放中可实时切换速度
+                if (playbackTimer) {
+                    clearInterval(playbackTimer);
+                    const newDelay = parseInt(this.dataset.delay);
+                    playbackTimer = setInterval(playbackStep, newDelay);
+                }
             });
         });
 
