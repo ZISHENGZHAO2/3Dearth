@@ -221,8 +221,15 @@
         <!-- 卫星参数 -->
         <div class="panel-section">
             <div class="section-title">🛰️ 卫星参数</div>
-            <!-- 卫星数量显示 -->
-            <div id="satCountDisplay" style="color:#88aacc; font-size:11px; margin-bottom:10px;">卫星列表：加载中...</div>
+            <!-- 卫星数量显示与选择 -->
+            <div id="satCountDisplay" style="color:#88aacc; font-size:11px; margin-bottom:6px;">卫星列表：加载中...</div>
+            <div style="margin-bottom:10px;">
+                <select id="satSelector" onchange="onSatSelected(this.value)" style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(68,136,170,0.4);color:#fff;padding:6px 8px;border-radius:4px;font-size:12px;outline:none;">
+                    <option value="">— 选择卫星查看参数 —</option>
+                </select>
+                <style>#satSelector option { background: #0a0a2a; color: #ccddee; }</style>
+                <div style="color:#667788;font-size:9px;margin-top:4px;">选中后自动填充高度和倾角，可手动修改</div>
+            </div>
             
             <div class="param-grid">
                 <div class="param-item" id="piHeight">
@@ -329,6 +336,9 @@
         '#ffaa44', '#66ffaa', '#ff88cc', '#88ccff'
     ];
 
+    // 当前选中的卫星 ID（用于参数覆盖），null = 未选中
+    let selectedSatId = null;
+
     function loadDisplayListSatellites() {
         allSatellites = [];
         const countEl = document.getElementById('satCountDisplay');
@@ -349,7 +359,7 @@
                 if (!params) continue;
                 allSatellites.push({
                     name: sat.name || 'Unknown',
-                    id: sat.id || '',
+                    id: String(sat.id || ''),
                     tle1: sat.tle1,
                     tle2: sat.tle2,
                     altitude: params.altitude,
@@ -358,9 +368,41 @@
                 });
             }
             countEl.textContent = `卫星列表：${allSatellites.length} 颗卫星`;
+            // 填充卫星选择下拉框
+            populateSatSelector();
         } catch (e) {
             countEl.textContent = '读取失败';
             console.error('读取显示列表失败:', e);
+        }
+    }
+
+    // ====================== 卫星选择下拉框 ======================
+    function populateSatSelector() {
+        const sel = document.getElementById('satSelector');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">— 选择卫星查看参数 —</option>';
+        for (const sat of allSatellites) {
+            const opt = document.createElement('option');
+            opt.value = String(sat.id || sat.name);
+            opt.textContent = '🛰️ ' + sat.name + (sat.constellation ? ' (' + sat.constellation + ')' : '');
+            sel.appendChild(opt);
+        }
+        selectedSatId = null;
+    }
+
+    // 卫星选择变更：自动填充高度和倾角，用户可手动修改覆盖
+    function onSatSelected(val) {
+        if (!val) {
+            selectedSatId = null;
+            document.getElementById('pHeight').value = 300;
+            document.getElementById('pInclination').value = 45;
+            return;
+        }
+        selectedSatId = val;
+        const sat = allSatellites.find(s => String(s.id || s.name) === val);
+        if (sat) {
+            document.getElementById('pHeight').value = Math.round(sat.altitude);
+            document.getElementById('pInclination').value = Math.round(sat.inclination);
         }
     }
 
@@ -431,6 +473,7 @@
             const legend = document.createElement('div');
             legend.className = 'chart-legend';
             legend.innerHTML =
+                '<span class="legend-item"><span class="legend-dot" style="background:#ff4466;"></span> 理想</span>' +
                 '<span class="legend-item"><span class="legend-dot" style="background:' + r.color + ';"></span> 实际</span>' +
                 '<span class="legend-item"><span class="legend-dot" style="background:' + r.color + ';opacity:0.55;"></span> 收拢</span>';
             card.appendChild(legend);
@@ -520,17 +563,16 @@
             ctx.fillText(gi + '年', x, padding.top + plotH + 4);
         }
 
-        // 理想高度线（虚线，匹配卫星颜色）
-        ctx.strokeStyle = satResult.color;
-        ctx.globalAlpha = 0.3;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 4]);
+        // 红色理想轨道曲线（恒定初始高度）
+        ctx.strokeStyle = '#ff0909';
+        ctx.globalAlpha = 0.8;
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([]);
         ctx.beginPath();
         const idY0 = padding.top + (1 - (satResult.initAlt - yMin) / yRange) * plotH;
         ctx.moveTo(padding.left, idY0);
         ctx.lineTo(padding.left + plotW, idY0);
         ctx.stroke();
-        ctx.setLineDash([]);
         ctx.globalAlpha = 1;
 
         // 实际衰减曲线（实线）
@@ -602,17 +644,37 @@
     function runSimulation() {
         const p = readParams();
         if (allSatellites.length === 0) {
-            drawMainChart([], 5);
+            drawAllCharts([], 5);
             return;
         }
         allSatResults = [];
         for (let idx = 0; idx < allSatellites.length; idx++) {
             const sat = allSatellites[idx];
             const color = SAT_COLORS[idx % SAT_COLORS.length];
-            const h0 = sat.altitude;
-            const inc = sat.inclination;
-            const data = calculateOrbitDecay(h0, p.mass, p.Cd, p.Ad, p.As, p.Ps, inc, p.years);
-            const dataFolded = calculateOrbitDecay(h0, p.mass, p.Cd, p.Ad * 0.2, p.As * 0.05, p.Ps, inc, p.years);
+            // 如果选中了这颗卫星，使用输入框中的所有参数进行覆盖
+            const satId = String(sat.id || sat.name);
+            let h0, inc, mass, Cd, Ad, As, Ps;
+            if (selectedSatId && selectedSatId === satId) {
+                // 选中卫星：使用输入框参数（全部覆盖）
+                h0 = parseFloat(document.getElementById('pHeight').value);
+                inc = parseFloat(document.getElementById('pInclination').value);
+                mass = p.mass;
+                Cd = p.Cd;
+                Ad = p.Ad;
+                As = p.As;
+                Ps = p.Ps;
+            } else {
+                // 未选中本卫星（或未选中任何卫星）：使用 TLE 自带高度/倾角 + 默认参数
+                h0 = sat.altitude;
+                inc = sat.inclination;
+                mass = 240;
+                Cd = 2.2;
+                Ad = 1.5;
+                As = 7;
+                Ps = 4.56e-6;
+            }
+            const data = calculateOrbitDecay(h0, mass, Cd, Ad, As, Ps, inc, p.years);
+            const dataFolded = calculateOrbitDecay(h0, mass, Cd, Ad * 0.2, As * 0.05, Ps, inc, p.years);
             const { h_m, months } = data;
             const h_km = new Float64Array(months);
             for (let i = 0; i < months; i++) h_km[i] = h_m[i] / 1000;
